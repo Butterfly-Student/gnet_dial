@@ -99,14 +99,14 @@ class MikrotikService
       $enhancedActive = [];
       foreach ($active as $session) {
         $username = $session['name'] ?? '';
-        
+
         // Add profile from secrets if available
         if (isset($secretsMap[$username])) {
           $session['profile'] = $secretsMap[$username]['profile'] ?? 'default';
         } else {
           $session['profile'] = 'default';
         }
-        
+
         $enhancedActive[] = $session;
       }
 
@@ -166,7 +166,7 @@ class MikrotikService
       // Persiapkan parameter ping
       $pingParams = [
         'address' => $address,
-        'count' => (string)$count,
+        'count' => (string) $count,
         'interval' => '1'
       ];
 
@@ -337,74 +337,121 @@ class MikrotikService
    */
   public function getInterfacesWithTraffic()
   {
-      try {
-          if (!$this->connected) {
-              throw new \Exception("Tidak terhubung ke MikroTik");
-          }
-
-          // Get all ether interfaces first
-          $interfaces = $this->api->comm('/interface/print', [
-              '?type' => 'ether'
-          ]);
-          
-          if (!is_array($interfaces)) return [];
-          
-          // Extract names for monitor-traffic
-          $names = [];
-          foreach ($interfaces as $iface) {
-              if (isset($iface['name'])) {
-                  $names[] = $iface['name'];
-              }
-          }
-          
-          if (empty($names)) return $interfaces;
-          
-          // Monitor traffic for all interfaces
-          // Note: monitor-traffic with multiple interfaces returns an array of stats
-          $traffic = $this->api->comm('/interface/monitor-traffic', [
-              'interface' => implode(',', $names),
-              'once' => ''
-          ]);
-          
-          // Map traffic data back to interfaces
-          $trafficMap = [];
-          if (is_array($traffic)) {
-              foreach ($traffic as $t) {
-                  if (isset($t['name'])) {
-                      $trafficMap[$t['name']] = $t;
-                  }
-              }
-          }
-          
-          // Merge
-          foreach ($interfaces as &$iface) {
-              if (isset($iface['name']) && isset($trafficMap[$iface['name']])) {
-                  // Merge traffic stats (rx-bits-per-second, etc)
-                  $iface = array_merge($iface, $trafficMap[$iface['name']]);
-              }
-          }
-          
-          return $interfaces;
-      } catch (\Exception $e) {
-          throw new \Exception("Gagal mengambil data interface: " . $e->getMessage());
+    try {
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
       }
+
+      // Get all ether interfaces first
+      $interfaces = $this->api->comm('/interface/print', [
+        '?type' => 'ether'
+      ]);
+
+      if (!is_array($interfaces))
+        return [];
+
+      // Extract names for monitor-traffic
+      $names = [];
+      foreach ($interfaces as $iface) {
+        if (isset($iface['name'])) {
+          $names[] = $iface['name'];
+        }
+      }
+
+      if (empty($names))
+        return $interfaces;
+
+      // Monitor traffic for all interfaces
+      // Note: monitor-traffic with multiple interfaces returns an array of stats
+      $traffic = $this->api->comm('/interface/monitor-traffic', [
+        'interface' => implode(',', $names),
+        'once' => ''
+      ]);
+
+      // Map traffic data back to interfaces
+      $trafficMap = [];
+      if (is_array($traffic)) {
+        foreach ($traffic as $t) {
+          if (isset($t['name'])) {
+            $trafficMap[$t['name']] = $t;
+          }
+        }
+      }
+
+      // Merge
+      foreach ($interfaces as &$iface) {
+        if (isset($iface['name']) && isset($trafficMap[$iface['name']])) {
+          // Merge traffic stats (rx-bits-per-second, etc)
+          $iface = array_merge($iface, $trafficMap[$iface['name']]);
+        }
+      }
+
+      return $interfaces;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal mengambil data interface: " . $e->getMessage());
+    }
   }
 
   public function getSimpleQueues()
   {
-      try {
-          if (!$this->connected) {
-              throw new \Exception("Tidak terhubung ke MikroTik");
-          }
-          
-          // Fetch all queues with stats
-          $response = $this->api->comm('/queue/simple/print', [
-              'stats' => '' 
-          ]);
-          return $response;
-      } catch (\Exception $e) {
-          throw new \Exception("Gagal mengambil data simple queues: " . $e->getMessage());
+    try {
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
       }
+
+      // Fetch all queues with stats
+      $response = $this->api->comm('/queue/simple/print', [
+        'stats' => ''
+      ]);
+      return $response;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal mengambil data simple queues: " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Get queue traffic data by username
+   * @param string $username Username to get traffic for
+   * @return array|null Queue traffic data or null if not found
+   */
+  public function getQueueTrafficByUsername($username)
+  {
+    try {
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      // Queue names usually prefixed with '<pppoe-' or just '<'
+      // Try with pppoe- prefix first
+      $queueName = '<pppoe-' . $username . '>';
+
+      $response = $this->api->comm('/queue/simple/print', [
+        '?name' => $queueName,
+        'stats' => ''
+      ]);
+
+      // If not found with pppoe- prefix, try without prefix
+      if (empty($response)) {
+        $queueName = '<' . $username . '>';
+        $response = $this->api->comm('/queue/simple/print', [
+          '?name' => $queueName,
+          'stats' => ''
+        ]);
+      }
+
+      // If still not found, try exact username
+      if (empty($response)) {
+        $response = $this->api->comm('/queue/simple/print', [
+          '?name' => $username,
+          'stats' => ''
+        ]);
+      }
+
+      // Return first result or null
+      return !empty($response) && is_array($response) ? $response[0] : null;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal mengambil data queue traffic untuk user '$username': " . $e->getMessage());
+    }
   }
 
   public function searchActivePPP($searchTerm)
@@ -413,26 +460,32 @@ class MikrotikService
       $activeSecrets = $this->getPPPActive();
       $allSecrets = $this->getPPPSecrets();
 
+      // Get queue data for traffic information
+      $queues = $this->getSimpleQueues();
+
       $filtered = [];
 
       // Search in active sessions only
       foreach ($activeSecrets as $active) {
         // Check standard fields plus caller-id (MAC) and address (IP)
         $match = false;
-        
-        if (isset($active['name']) && stripos($active['name'], $searchTerm) !== false) $match = true;
-        else if (isset($active['caller-id']) && stripos($active['caller-id'], $searchTerm) !== false) $match = true;
-        else if (isset($active['address']) && stripos($active['address'], $searchTerm) !== false) $match = true;
+
+        if (isset($active['name']) && stripos($active['name'], $searchTerm) !== false)
+          $match = true;
+        else if (isset($active['caller-id']) && stripos($active['caller-id'], $searchTerm) !== false)
+          $match = true;
+        else if (isset($active['address']) && stripos($active['address'], $searchTerm) !== false)
+          $match = true;
         // Verify against secret's last-caller-id if available
         else {
-           foreach ($allSecrets as $secret) {
-             if (isset($secret['name']) && $secret['name'] === $active['name']) {
-                if (isset($secret['last-caller-id']) && stripos($secret['last-caller-id'], $searchTerm) !== false) {
-                    $match = true;
-                }
-                break;
-             }
-           }
+          foreach ($allSecrets as $secret) {
+            if (isset($secret['name']) && $secret['name'] === $active['name']) {
+              if (isset($secret['last-caller-id']) && stripos($secret['last-caller-id'], $searchTerm) !== false) {
+                $match = true;
+              }
+              break;
+            }
+          }
         }
 
         if ($match) {
@@ -445,6 +498,50 @@ class MikrotikService
             }
           }
 
+          // Find queue data for this user
+          $queueData = null;
+          $username = $active['name'];
+          foreach ($queues as $queue) {
+            $queueName = isset($queue['name']) ? $queue['name'] : '';
+            // Remove < > characters from queue name
+            $queueName = str_replace(['<', '>'], '', $queueName);
+
+            if ($queueName === $username) {
+              $queueData = $queue;
+              break;
+            }
+          }
+
+          // Parse queue traffic data
+          $trafficData = [
+            'rx-rate' => '0',
+            'tx-rate' => '0',
+            'bytes-up' => '0',
+            'bytes-down' => '0',
+            'max-limit' => 'Unlimited'
+          ];
+
+          if ($queueData) {
+            // Parse rate (format: "uploadbps/downloadbps")
+            if (isset($queueData['rate'])) {
+              $rateParts = explode('/', str_replace('bps', '', $queueData['rate']));
+              $trafficData['tx-rate'] = isset($rateParts[0]) ? trim($rateParts[0]) : '0';
+              $trafficData['rx-rate'] = isset($rateParts[1]) ? trim($rateParts[1]) : '0';
+            }
+
+            // Parse bytes (format: "upload/download")
+            if (isset($queueData['bytes'])) {
+              $bytesParts = explode('/', $queueData['bytes']);
+              $trafficData['bytes-up'] = isset($bytesParts[0]) ? trim($bytesParts[0]) : '0';
+              $trafficData['bytes-down'] = isset($bytesParts[1]) ? trim($bytesParts[1]) : '0';
+            }
+
+            // Get max limit
+            if (isset($queueData['max-limit'])) {
+              $trafficData['max-limit'] = $queueData['max-limit'];
+            }
+          }
+
           // Return only required fields
           $result = [
             'name' => $active['name'],
@@ -453,11 +550,14 @@ class MikrotikService
             'status' => 'active',
             'address' => isset($active['address']) ? $active['address'] : '',
             'uptime' => isset($active['uptime']) ? $active['uptime'] : '',
-            'address' => isset($active['address']) ? $active['address'] : '',
-            'uptime' => isset($active['uptime']) ? $active['uptime'] : '',
             'caller-id' => isset($active['caller-id']) ? $active['caller-id'] : '',
             'last-caller-id' => isset($secretInfo['last-caller-id']) ? $secretInfo['last-caller-id'] : '',
-            'last-caller-id' => isset($secretInfo['last-caller-id']) ? $secretInfo['last-caller-id'] : ''
+            // Add traffic data
+            'rx-rate' => $trafficData['rx-rate'],
+            'tx-rate' => $trafficData['tx-rate'],
+            'bytes-up' => $trafficData['bytes-up'],
+            'bytes-down' => $trafficData['bytes-down'],
+            'max-limit' => $trafficData['max-limit']
           ];
 
           $filtered[] = $result;
@@ -479,9 +579,12 @@ class MikrotikService
       // Search in inactive secrets only
       foreach ($inactiveSecrets as $secret) {
         $match = false;
-        if (isset($secret['name']) && stripos($secret['name'], $searchTerm) !== false) $match = true;
-        else if (isset($secret['comment']) && stripos($secret['comment'], $searchTerm) !== false) $match = true;
-        else if (isset($secret['caller-id']) && stripos($secret['caller-id'], $searchTerm) !== false) $match = true;
+        if (isset($secret['name']) && stripos($secret['name'], $searchTerm) !== false)
+          $match = true;
+        else if (isset($secret['comment']) && stripos($secret['comment'], $searchTerm) !== false)
+          $match = true;
+        else if (isset($secret['caller-id']) && stripos($secret['caller-id'], $searchTerm) !== false)
+          $match = true;
 
         if ($match) {
           // Return only required fields
@@ -520,12 +623,18 @@ class MikrotikService
       // Search in inactive secrets
       foreach ($inactiveSecrets as $secret) {
         $match = false;
-        if (isset($secret['name']) && stripos($secret['name'], $searchTerm) !== false) $match = true;
-        else if (isset($secret['comment']) && stripos($secret['comment'], $searchTerm) !== false) $match = true;
-        if (isset($secret['name']) && stripos($secret['name'], $searchTerm) !== false) $match = true;
-        else if (isset($secret['comment']) && stripos($secret['comment'], $searchTerm) !== false) $match = true;
-        else if (isset($secret['caller-id']) && stripos($secret['caller-id'], $searchTerm) !== false) $match = true;
-        else if (isset($secret['last-caller-id']) && stripos($secret['last-caller-id'], $searchTerm) !== false) $match = true;
+        if (isset($secret['name']) && stripos($secret['name'], $searchTerm) !== false)
+          $match = true;
+        else if (isset($secret['comment']) && stripos($secret['comment'], $searchTerm) !== false)
+          $match = true;
+        if (isset($secret['name']) && stripos($secret['name'], $searchTerm) !== false)
+          $match = true;
+        else if (isset($secret['comment']) && stripos($secret['comment'], $searchTerm) !== false)
+          $match = true;
+        else if (isset($secret['caller-id']) && stripos($secret['caller-id'], $searchTerm) !== false)
+          $match = true;
+        else if (isset($secret['last-caller-id']) && stripos($secret['last-caller-id'], $searchTerm) !== false)
+          $match = true;
 
         if ($match) {
           // Return all fields from secret and add status
@@ -538,11 +647,16 @@ class MikrotikService
       // Search in active sessions
       foreach ($activeSecrets as $active) {
         $match = false;
-        if (isset($active['name']) && stripos($active['name'], $searchTerm) !== false) $match = true;
-        else if (isset($active['caller-id']) && stripos($active['caller-id'], $searchTerm) !== false) $match = true;
-        if (isset($active['name']) && stripos($active['name'], $searchTerm) !== false) $match = true;
-        else if (isset($active['caller-id']) && stripos($active['caller-id'], $searchTerm) !== false) $match = true;
-        else if (isset($active['address']) && stripos($active['address'], $searchTerm) !== false) $match = true;
+        if (isset($active['name']) && stripos($active['name'], $searchTerm) !== false)
+          $match = true;
+        else if (isset($active['caller-id']) && stripos($active['caller-id'], $searchTerm) !== false)
+          $match = true;
+        if (isset($active['name']) && stripos($active['name'], $searchTerm) !== false)
+          $match = true;
+        else if (isset($active['caller-id']) && stripos($active['caller-id'], $searchTerm) !== false)
+          $match = true;
+        else if (isset($active['address']) && stripos($active['address'], $searchTerm) !== false)
+          $match = true;
 
         if ($match) {
           // Find the corresponding secret info
@@ -553,27 +667,27 @@ class MikrotikService
               break;
             }
           }
-          
+
           // Re-check detailed search against secret info if basic match failed but we are here? 
           // Actually, if match is false, we should check secret info for last-caller-id
           if (!$match && $secretInfo) {
-             if (isset($secretInfo['last-caller-id']) && stripos($secretInfo['last-caller-id'], $searchTerm) !== false) {
-                 $match = true;
-             }
+            if (isset($secretInfo['last-caller-id']) && stripos($secretInfo['last-caller-id'], $searchTerm) !== false) {
+              $match = true;
+            }
           }
-          
+
           if ($match) {
-             // Merge active session data with secret info
-             $result = $active; 
+            // Merge active session data with secret info
+            $result = $active;
 
-             // Add/override with secret info if available
-             if ($secretInfo) {
-               $result = array_merge($secretInfo, $result);
-             }
+            // Add/override with secret info if available
+            if ($secretInfo) {
+              $result = array_merge($secretInfo, $result);
+            }
 
-             // Ensure status is set to active
-             $result['status'] = 'active';
-             $activeResults[] = $result;
+            // Ensure status is set to active
+            $result['status'] = 'active';
+            $activeResults[] = $result;
           }
         }
       }
@@ -597,9 +711,12 @@ class MikrotikService
 
       foreach ($secrets as $secret) {
         $match = false;
-        if (isset($secret['name']) && stripos($secret['name'], $searchTerm) !== false) $match = true;
-        else if (isset($secret['comment']) && stripos($secret['comment'], $searchTerm) !== false) $match = true;
-        else if (isset($secret['caller-id']) && stripos($secret['caller-id'], $searchTerm) !== false) $match = true;
+        if (isset($secret['name']) && stripos($secret['name'], $searchTerm) !== false)
+          $match = true;
+        else if (isset($secret['comment']) && stripos($secret['comment'], $searchTerm) !== false)
+          $match = true;
+        else if (isset($secret['caller-id']) && stripos($secret['caller-id'], $searchTerm) !== false)
+          $match = true;
 
         if ($match) {
           $filtered[] = $secret;
@@ -701,7 +818,7 @@ class MikrotikService
       }
 
       $params = [];
-      
+
       // If searching, we fetch more logs internally to find matches
       $fetchLimit = !empty($searchTerm) ? 1000 : $limit;
 
@@ -713,7 +830,7 @@ class MikrotikService
 
       // Filter in PHP if search term is provided
       if (!empty($searchTerm)) {
-        $logs = array_filter($logs, function($log) use ($searchTerm) {
+        $logs = array_filter($logs, function ($log) use ($searchTerm) {
           $message = $log['message'] ?? '';
           $topics = $log['topics'] ?? '';
           return stripos($message, $searchTerm) !== false || stripos($topics, $searchTerm) !== false;
@@ -722,7 +839,7 @@ class MikrotikService
 
       // Reverse logs to show newest first and limit
       $logs = array_reverse($logs);
-      
+
       if ($limit > 0) {
         $logs = array_slice($logs, 0, $limit);
       }
@@ -782,6 +899,30 @@ class MikrotikService
     }
   }
 
+  /**
+   * Get system resource information
+   * @return array|null Resource info or null on failure
+   */
+  public function getSystemResource()
+  {
+    try {
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      $response = $this->api->comm('/system/resource/print');
+
+      // MikroTik returns array of results, we need the first one
+      if (is_array($response) && !empty($response)) {
+        return $response[0];
+      }
+
+      return null;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal mengambil system resource: " . $e->getMessage());
+    }
+  }
+
   public function __destruct()
   {
     if ($this->api && $this->connected) {
@@ -789,3 +930,4 @@ class MikrotikService
     }
   }
 }
+

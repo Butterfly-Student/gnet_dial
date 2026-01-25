@@ -39,8 +39,8 @@ $router->post('/settings', 'MikrotikController@updateSettings');
 // API Routes (JSON Responses)
 // ============================================================================
 
-$router->group('/api', function($router) {
-    
+$router->group('/api', function ($router) {
+
     // PPP API
     $router->post('/ppp/active', 'PppController@getActiveUsers');
     $router->post('/ppp/non-active', 'PppController@getNonActiveUsers');
@@ -49,7 +49,8 @@ $router->group('/api', function($router) {
     $router->post('/ppp/disconnect-multiple', 'PppController@disconnectMultiple');
     $router->post('/ppp/toggle-isolir', 'PppController@toggleIsolir');
     $router->post('/ppp/isolir-config', 'PppController@getIsolirConfig');
-    
+    $router->post('/ppp/queue/traffic', 'PppController@getQueueTraffic');
+
     // MikroTik API
     $router->post('/mikrotik/get-all', 'MikrotikController@getAll');
     $router->post('/mikrotik/add', 'MikrotikController@addApi');
@@ -60,7 +61,8 @@ $router->group('/api', function($router) {
     $router->post('/mikrotik/logs', 'MikrotikController@getLogs');
     $router->post('/mikrotik/ping', 'MikrotikController@ping');
     $router->post('/mikrotik/monitor', 'MikrotikController@monitor');
-    
+    $router->post('/mikrotik/resource/info', 'MikrotikController@resourceInfo');
+
     // User API
     $router->post('/user/get-all', 'UserController@getAll');
     $router->post('/user/add', 'UserController@add');
