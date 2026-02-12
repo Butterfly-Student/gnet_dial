@@ -166,7 +166,7 @@ class BaseModel {
      * @param array $params
      * @return \PDOStatement
      */
-    protected static function query($sql, $params = []) {
+    public static function query($sql, $params = []) {
         $pdo = static::getConnection();
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
