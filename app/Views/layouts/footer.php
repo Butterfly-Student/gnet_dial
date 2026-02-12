@@ -29,6 +29,30 @@
         </a>
       </div>
     </nav>
+
+    <script>
+      $(document).ready(function() {
+        // Mobile sidebar toggle
+        function openSidebar() {
+          $('#mobile-sidebar').removeClass('hidden');
+          setTimeout(() => {
+            $('#sidebar-panel').removeClass('-translate-x-full');
+          }, 10);
+        }
+
+        function closeSidebar() {
+          $('#sidebar-panel').addClass('-translate-x-full');
+          setTimeout(() => {
+            $('#mobile-sidebar').addClass('hidden');
+          }, 300);
+        }
+
+        $('#mobile-menu-toggle').on('click', openSidebar);
+        $('#sidebar-backdrop').on('click', closeSidebar);
+        $('#close-sidebar-btn').on('click', closeSidebar);
+        $('#mobile-sidebar nav a').on('click', closeSidebar);
+      });
+    </script>
   </div>
 </body>
 </html>

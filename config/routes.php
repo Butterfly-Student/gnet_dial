@@ -28,6 +28,8 @@ $router->get('/dashboard', 'DashboardController@index');
 // PPP Management
 $router->get('/ppp/active', 'PppController@active');
 $router->get('/ppp/non-active', 'PppController@nonActive');
+$router->get('/ppp/secrets', 'PppController@secrets');
+$router->get('/ppp/profiles', 'PppController@profiles');
 
 // Settings
 $router->get('/mikrotik/logs', 'MikrotikController@logs');
@@ -50,6 +52,33 @@ $router->group('/api', function ($router) {
     $router->post('/ppp/toggle-isolir', 'PppController@toggleIsolir');
     $router->post('/ppp/isolir-config', 'PppController@getIsolirConfig');
     $router->post('/ppp/queue/traffic', 'PppController@getQueueTraffic');
+    $router->post('/ppp/secrets', 'PppController@getSecrets');
+    $router->post('/ppp/secret/get', 'PppController@getSecret');
+    $router->post('/ppp/secret/add', 'PppController@addSecret');
+    $router->post('/ppp/secret/update', 'PppController@updateSecret');
+    $router->post('/ppp/secret/delete', 'PppController@deleteSecret');
+    $router->post('/ppp/secret/toggle', 'PppController@toggleSecret');
+    $router->post('/ppp/profiles', 'PppController@getProfilesList');
+
+    // IP Pool API
+    $router->post('/ppp/ip-pools', 'PppController@getIpPools');
+    $router->post('/ppp/ip-pool/get', 'PppController@getIpPool');
+    $router->post('/ppp/ip-pool/add', 'PppController@addIpPool');
+    $router->post('/ppp/ip-pool/update', 'PppController@updateIpPool');
+    $router->post('/ppp/ip-pool/delete', 'PppController@deleteIpPool');
+
+    // Parent Queue API
+    $router->post('/ppp/parent-queues', 'PppController@getParentQueues');
+    $router->post('/ppp/parent-queue/get', 'PppController@getParentQueue');
+    $router->post('/ppp/parent-queue/add', 'PppController@addParentQueue');
+    $router->post('/ppp/parent-queue/update', 'PppController@updateParentQueue');
+    $router->post('/ppp/parent-queue/delete', 'PppController@deleteParentQueue');
+
+    // PPP Profile API
+    $router->post('/ppp/profile/get', 'PppController@getProfile');
+    $router->post('/ppp/profile/add', 'PppController@addProfile');
+    $router->post('/ppp/profile/update', 'PppController@updateProfile');
+    $router->post('/ppp/profile/delete', 'PppController@deleteProfile');
 
     // MikroTik API
     $router->post('/mikrotik/get-all', 'MikrotikController@getAll');
@@ -61,6 +90,7 @@ $router->group('/api', function ($router) {
     $router->post('/mikrotik/logs', 'MikrotikController@getLogs');
     $router->post('/mikrotik/ping', 'MikrotikController@ping');
     $router->post('/mikrotik/monitor', 'MikrotikController@monitor');
+    $router->post('/mikrotik/check', 'MikrotikController@checkConnection');
     $router->post('/mikrotik/resource/info', 'MikrotikController@resourceInfo');
 
     // User API

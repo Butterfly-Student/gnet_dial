@@ -19,13 +19,22 @@ class MikrotikService
     $this->port = $port;
     $this->username = $username;
     $this->password = $password;
+  }
+
+  private function connect()
+  {
+    if ($this->connected) {
+      return;
+    }
 
     try {
       $this->api = new \RouterosAPI();
-      $this->api->port = $port;
+      $this->api->port = $this->port;
 
-      // Attempt to connect
-      if (!$this->api->connect($host, $username, $password)) {
+      // Set timeout for connection attempt to avoid long hangs
+      // Note: RouterosAPI might not support timeout configuration directly in connect,
+      // but we wrap this in try-catch.
+      if (!$this->api->connect($this->host, $this->username, $this->password)) {
         throw new \Exception("Koneksi ke MikroTik gagal");
       }
       $this->connected = true;
@@ -37,6 +46,8 @@ class MikrotikService
   public function testConnection()
   {
     try {
+      $this->connect();
+
       if (!$this->connected) {
         return false;
       }
@@ -52,6 +63,8 @@ class MikrotikService
   public function getPPPSecrets()
   {
     try {
+      $this->connect();
+
       if (!$this->connected) {
         throw new \Exception("Tidak terhubung ke MikroTik");
       }
@@ -72,6 +85,8 @@ class MikrotikService
   public function getPPPActive()
   {
     try {
+      $this->connect();
+
       if (!$this->connected) {
         throw new \Exception("Tidak terhubung ke MikroTik");
       }
@@ -119,6 +134,7 @@ class MikrotikService
   public function getNonActiveSecrets()
   {
     try {
+      // getPPPSecrets and getPPPActive will handle connection
       $secrets = $this->getPPPSecrets();
       $active = $this->getPPPActive();
 
@@ -151,6 +167,7 @@ class MikrotikService
   public function pingAddress($address, $count = 1)
   {
     try {
+      $this->connect();
       if (!$this->connected) {
         throw new \Exception("Tidak terhubung ke MikroTik");
       }
@@ -299,6 +316,7 @@ class MikrotikService
   public function interfaceTrafic($interfaceName)
   {
     try {
+      $this->connect();
       if (!$this->connected) {
         throw new \Exception("Tidak terhubung ke MikroTik");
       }
@@ -317,6 +335,7 @@ class MikrotikService
   public function getAllInterfaceType($interfaceType)
   {
     try {
+      $this->connect();
       if (!$this->connected) {
         throw new \Exception("Tidak terhubung ke MikroTik");
       }
@@ -338,6 +357,7 @@ class MikrotikService
   public function getInterfacesWithTraffic()
   {
     try {
+      $this->connect();
       if (!$this->connected) {
         throw new \Exception("Tidak terhubung ke MikroTik");
       }
@@ -395,6 +415,7 @@ class MikrotikService
   public function getSimpleQueues()
   {
     try {
+      $this->connect();
       if (!$this->connected) {
         throw new \Exception("Tidak terhubung ke MikroTik");
       }
@@ -417,6 +438,7 @@ class MikrotikService
   public function getQueueTrafficByUsername($username)
   {
     try {
+      $this->connect();
       if (!$this->connected) {
         throw new \Exception("Tidak terhubung ke MikroTik");
       }
@@ -737,6 +759,7 @@ class MikrotikService
   public function disconnectPppActive($username)
   {
     try {
+      $this->connect();
       if (!$this->connected) {
         throw new \Exception("Tidak terhubung ke MikroTik");
       }
@@ -813,6 +836,7 @@ class MikrotikService
   public function getLogs($limit = 100, $searchTerm = '')
   {
     try {
+      $this->connect();
       if (!$this->connected) {
         throw new \Exception("Tidak terhubung ke MikroTik");
       }
@@ -859,6 +883,7 @@ class MikrotikService
   public function updatePppSecretProfile($username, $profile)
   {
     try {
+      $this->connect();
       if (!$this->connected) {
         throw new \Exception("Tidak terhubung ke MikroTik");
       }
@@ -906,6 +931,7 @@ class MikrotikService
   public function getSystemResource()
   {
     try {
+      $this->connect();
       if (!$this->connected) {
         throw new \Exception("Tidak terhubung ke MikroTik");
       }
@@ -920,6 +946,785 @@ class MikrotikService
       return null;
     } catch (\Exception $e) {
       throw new \Exception("Gagal mengambil system resource: " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Get PPP Secret by name
+   * @param string $name Username to find
+   * @return array|null Secret data or null if not found
+   */
+  public function getPppSecretByName($name)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      $secrets = $this->api->comm('/ppp/secret/print', [
+        '?name' => $name
+      ]);
+
+      if (empty($secrets) || !is_array($secrets)) {
+        return null;
+      }
+
+      return $secrets[0];
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal mengambil PPP secret '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Add new PPP Secret
+   * @param string $name Username
+   * @param string $password Password
+   * @param string $profile Profile name
+   * @param bool $disabled Disabled status
+   * @return bool True on success
+   */
+  public function addPppSecret($name, $password, $profile, $disabled = false)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      $params = [
+        'name' => $name,
+        'password' => $password,
+        'profile' => $profile
+      ];
+
+      if ($disabled) {
+        $params['disabled'] = 'yes';
+      }
+
+      $this->api->comm('/ppp/secret/add', $params);
+
+      return true;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal menambah PPP secret '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Update PPP Secret
+   * @param string $name Username (current name)
+   * @param string $password New password (optional, null to keep current)
+   * @param string $profile New profile
+   * @param bool $disabled Disabled status
+   * @return bool True on success
+   */
+  public function updatePppSecret($name, $password, $profile, $disabled)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      // Get the secret ID first
+      $secrets = $this->api->comm('/ppp/secret/print', [
+        '?name' => $name
+      ]);
+
+      if (empty($secrets)) {
+        throw new \Exception("PPP secret '$name' tidak ditemukan");
+      }
+
+      $secretId = $secrets[0]['.id'];
+
+      // Prepare update parameters
+      $params = [
+        '.id' => $secretId,
+        'profile' => $profile
+      ];
+
+      // Update password only if provided
+      if (!empty($password)) {
+        $params['password'] = $password;
+      }
+
+      if ($disabled) {
+        $params['disabled'] = 'yes';
+      } else {
+        $params['disabled'] = 'no';
+      }
+
+      $this->api->comm('/ppp/secret/set', $params);
+
+      return true;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal mengupdate PPP secret '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Delete PPP Secret
+   * @param string $name Username to delete
+   * @return bool True on success
+   */
+  public function deletePppSecret($name)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      // Check if user is active
+      $activeSessions = $this->api->comm('/ppp/active/print', [
+        '?name' => $name
+      ]);
+
+      if (!empty($activeSessions)) {
+        throw new \Exception("User '$name' sedang aktif. Disconnect terlebih dahulu.");
+      }
+
+      // Get secret ID
+      $secrets = $this->api->comm('/ppp/secret/print', [
+        '?name' => $name
+      ]);
+
+      if (empty($secrets)) {
+        throw new \Exception("PPP secret '$name' tidak ditemukan");
+      }
+
+      $secretId = $secrets[0]['.id'];
+
+      $this->api->comm('/ppp/secret/remove', [
+        '.id' => $secretId
+      ]);
+
+      return true;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal menghapus PPP secret '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Set PPP Secret Disabled status
+   * @param string $name Username
+   * @param bool $disabled Disabled status
+   * @return bool True on success
+   */
+  public function setPppSecretDisabled($name, $disabled)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      // Get secret ID
+      $secrets = $this->api->comm('/ppp/secret/print', [
+        '?name' => $name
+      ]);
+
+      if (empty($secrets)) {
+        throw new \Exception("PPP secret '$name' tidak ditemukan");
+      }
+
+      $secretId = $secrets[0]['.id'];
+
+      $this->api->comm('/ppp/secret/set', [
+        '.id' => $secretId,
+        'disabled' => $disabled ? 'yes' : 'no'
+      ]);
+
+      // If disabling and user is active, disconnect them
+      if ($disabled) {
+        $activeSessions = $this->api->comm('/ppp/active/print', [
+          '?name' => $name
+        ]);
+
+        if (!empty($activeSessions)) {
+          foreach ($activeSessions as $session) {
+            $this->api->comm('/ppp/active/remove', [
+              '.id' => $session['.id']
+            ]);
+          }
+        }
+      }
+
+      return true;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal mengubah status PPP secret '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Get all PPP Profiles
+   * @return array List of profile names
+   */
+  public function getPppProfiles()
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      $profiles = $this->api->comm('/ppp/profile/print');
+
+      if (!is_array($profiles)) {
+        return [];
+      }
+
+      // Extract profile names
+      $profileNames = [];
+      foreach ($profiles as $profile) {
+        if (isset($profile['name'])) {
+          $profileNames[] = $profile['name'];
+        }
+      }
+
+      return $profileNames;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal mengambil PPP profiles: " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Get all IP pools
+   * @return array List of IP pools with ranges
+   */
+  public function getIpPools()
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      $pools = $this->api->comm('/ip/pool/print');
+
+      if (!is_array($pools)) {
+        return [];
+      }
+
+      return $pools;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal mengambil IP pools: " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Get IP pool by name
+   * @param string $name Pool name
+   * @return array|null Pool data or null if not found
+   */
+  public function getIpPoolByName($name)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      $pools = $this->api->comm('/ip/pool/print', [
+        '?name' => $name
+      ]);
+
+      if (empty($pools) || !is_array($pools)) {
+        return null;
+      }
+
+      return $pools[0];
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal mengambil IP pool '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Add new IP pool
+   * @param string $name Pool name
+   * @param string $ranges IP ranges (e.g., "192.168.1.2-192.168.1.254")
+   * @return bool True on success
+   */
+  public function addIpPool($name, $ranges)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      // Check if pool already exists
+      $existing = $this->getIpPoolByName($name);
+      if ($existing) {
+        throw new \Exception("IP pool '$name' sudah ada");
+      }
+
+      $this->api->comm('/ip/pool/add', [
+        'name' => $name,
+        'ranges' => $ranges
+      ]);
+
+      return true;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal menambah IP pool '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Update IP pool
+   * @param string $name Pool name (current)
+   * @param string $ranges New IP ranges
+   * @return bool True on success
+   */
+  public function updateIpPool($name, $ranges)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      // Get pool ID
+      $pool = $this->getIpPoolByName($name);
+      if (!$pool) {
+        throw new \Exception("IP pool '$name' tidak ditemukan");
+      }
+
+      $poolId = $pool['.id'];
+
+      $this->api->comm('/ip/pool/set', [
+        '.id' => $poolId,
+        'ranges' => $ranges
+      ]);
+
+      return true;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal mengupdate IP pool '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Delete IP pool
+   * @param string $name Pool name
+   * @return bool True on success
+   */
+  public function deleteIpPool($name)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      // Get pool ID
+      $pool = $this->getIpPoolByName($name);
+      if (!$pool) {
+        throw new \Exception("IP pool '$name' tidak ditemukan");
+      }
+
+      $poolId = $pool['.id'];
+
+      $this->api->comm('/ip/pool/remove', [
+        '.id' => $poolId
+      ]);
+
+      return true;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal menghapus IP pool '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Get all parent queues
+   * @return array List of all queues
+   */
+  public function getParentQueues()
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      // Get all queues from MikroTik
+      $queues = $this->api->comm("/queue/simple/print", array(
+                "?dynamic" => "false",
+            ));
+
+      if (!is_array($queues)) {
+        return [];
+      }
+
+      // Return ALL queues without filtering
+      $queues = array_values($queues);
+
+      // Debug: Log semua queues
+      error_log("Total queues from MikroTik: " . count($queues));
+
+      return $queues;
+    } catch (\Exception $e) {
+      error_log("getParentQueues Exception: " . $e->getMessage());
+      throw new \Exception("Gagal mengambil parent queues: " . $e->getMessage());
+    }
+  }
+
+   /**
+    * Get parent queue by name
+    * @param string $name Queue name
+    * @return array|null Queue data or null if not found
+    */
+
+  /**
+   * Get parent queue by name
+   * @param string $name Queue name
+   * @return array|null Queue data or null if not found
+   */
+  public function getParentQueueByName($name)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      error_log("Looking for parent queue: " . $name);
+
+      $queues = $this->api->comm('/queue/simple/print', [
+        '?name' => $name
+      ]);
+
+      error_log("Queue search result for '$name': " . json_encode($queues));
+
+      if (empty($queues) || !is_array($queues)) {
+        error_log("Queue '$name' not found or empty response");
+        return null;
+      }
+
+      error_log("Queue '$name' found. Target: " . 
+                 (isset($queues[0]['target']) ? $queues[0]['target'] : 'none') . 
+                 ", Packet-mark: " . 
+                 (isset($queues[0]['packet-mark']) ? $queues[0]['packet-mark'] : 'none'));
+
+      // Return the queue regardless (parent queue caller knows what they're doing)
+      // Only return null if queue genuinely doesn't exist
+      return $queues[0];
+    } catch (\Exception $e) {
+      error_log("getParentQueueByName Error: " . $e->getMessage());
+      throw new \Exception("Gagal mengambil parent queue '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Add new parent queue
+   * @param string $name Queue name
+   * @param string $maxLimit Max rate limit (e.g., "10M/10M")
+   * @param string $packetMark Packet mark (optional)
+   * @return bool True on success
+   */
+  public function addParentQueue($name, $maxLimit, $packetMark = '')
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      // Check if queue already exists
+      $existing = $this->getParentQueueByName($name);
+      if ($existing) {
+        throw new \Exception("Parent queue '$name' sudah ada");
+      }
+
+      $params = [
+        'name' => $name,
+        'max-limit' => $maxLimit
+      ];
+
+      if (!empty($packetMark)) {
+        $params['packet-mark'] = $packetMark;
+      }
+
+      $this->api->comm('/queue/simple/add', $params);
+
+      return true;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal menambah parent queue '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Update parent queue
+   * @param string $name Queue name (current)
+   * @param string $maxLimit New max rate limit
+   * @param string $packetMark New packet mark (optional)
+   * @return bool True on success
+   */
+  public function updateParentQueue($name, $maxLimit, $packetMark = '')
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      // Get queue ID
+      $queue = $this->getParentQueueByName($name);
+      if (!$queue) {
+        throw new \Exception("Parent queue '$name' tidak ditemukan");
+      }
+
+      $queueId = $queue['.id'];
+
+      $params = [
+        '.id' => $queueId,
+        'max-limit' => $maxLimit
+      ];
+
+      if (!empty($packetMark)) {
+        $params['packet-mark'] = $packetMark;
+      }
+
+      $this->api->comm('/queue/simple/set', $params);
+
+      return true;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal mengupdate parent queue '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Delete parent queue
+   * @param string $name Queue name
+   * @return bool True on success
+   */
+  public function deleteParentQueue($name)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      // Get queue ID
+      $queue = $this->getParentQueueByName($name);
+      if (!$queue) {
+        throw new \Exception("Parent queue '$name' tidak ditemukan");
+      }
+
+      $queueId = $queue['.id'];
+
+      $this->api->comm('/queue/simple/remove', [
+        '.id' => $queueId
+      ]);
+
+      return true;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal menghapus parent queue '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Get all PPP profiles with full details
+   * @return array List of profiles with all attributes
+   */
+  public function getPppProfilesFull()
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      $profiles = $this->api->comm('/ppp/profile/print');
+
+      if (!is_array($profiles)) {
+        return [];
+      }
+
+      return $profiles;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal mengambil PPP profiles: " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Get PPP profile by name
+   * @param string $name Profile name
+   * @return array|null Profile data or null if not found
+   */
+  public function getPppProfileByName($name)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      $profiles = $this->api->comm('/ppp/profile/print', [
+        '?name' => $name
+      ]);
+
+      if (empty($profiles) || !is_array($profiles)) {
+        return null;
+      }
+
+      return $profiles[0];
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal mengambil PPP profile '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Add new PPP profile
+   * @param string $name Profile name
+   * @param string $localAddress Local address (IP pool name)
+   * @param string $remoteAddress Remote address (IP pool name)
+   * @param string $rateLimit Rate limit (e.g., "512k/1M")
+   * @param string $parentQueue Parent queue name
+   * @param bool $disabled Disabled status
+   * @return bool True on success
+   */
+  public function addPppProfile($name, $localAddress, $remoteAddress, $rateLimit, $parentQueue)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      // Check if profile already exists
+      $existing = $this->getPppProfileByName($name);
+      if ($existing) {
+        throw new \Exception("PPP profile '$name' sudah ada");
+      }
+
+      $params = [
+        'name' => $name,
+        'local-address' => $localAddress,
+        'remote-address' => $remoteAddress,
+        'rate-limit' => $rateLimit,
+        'parent-queue' => $parentQueue
+      ];
+
+
+      $this->api->comm('/ppp/profile/add', $params);
+
+      return true;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal menambah PPP profile '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Update PPP profile
+   * @param string $name Profile name (current)
+   * @param string $localAddress New local address (IP pool name)
+   * @param string $remoteAddress New remote address (IP pool name)
+   * @param string $rateLimit New rate limit
+   * @param string $parentQueue New parent queue name
+   * @param bool $disabled Disabled status
+   * @return bool True on success
+   */
+  public function updatePppProfile($name, $localAddress, $remoteAddress, $rateLimit, $parentQueue, $disabled)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      // Get profile ID
+      $profile = $this->getPppProfileByName($name);
+      if (!$profile) {
+        throw new \Exception("PPP profile '$name' tidak ditemukan");
+      }
+
+      $profileId = $profile['.id'];
+
+      $params = [
+        '.id' => $profileId,
+        'local-address' => $localAddress,
+        'remote-address' => $remoteAddress,
+        'rate-limit' => $rateLimit,
+        'parent-queue' => $parentQueue
+      ];
+
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal mengupdate PPP profile '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Delete PPP profile
+   * @param string $name Profile name
+   * @return bool True on success
+   */
+  public function deletePppProfile($name)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      // Check if profile is used by any PPP secret
+      if ($this->isProfileUsedBySecrets($name)) {
+        throw new \Exception("Profile '$name' sedang digunakan oleh PPP secret. Hapus/pindahkan secret terlebih dahulu.");
+      }
+
+      // Get profile ID
+      $profile = $this->getPppProfileByName($name);
+      if (!$profile) {
+        throw new \Exception("PPP profile '$name' tidak ditemukan");
+      }
+
+      $profileId = $profile['.id'];
+
+      $this->api->comm('/ppp/profile/remove', [
+        '.id' => $profileId
+      ]);
+
+      return true;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal menghapus PPP profile '$name': " . $e->getMessage());
+    }
+  }
+
+  /**
+   * Set PPP profile disabled status
+   * @param string $name Profile name
+   * @param bool $disabled Disabled status
+   * @return bool True on success
+   */
+
+  /**
+   * Check if profile is used by any PPP secret
+   * @param string $name Profile name
+   * @return bool True if profile is in use
+   */
+  public function isProfileUsedBySecrets($name)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      $secrets = $this->api->comm('/ppp/secret/print');
+
+      if (!is_array($secrets)) {
+        return false;
+      }
+
+      foreach ($secrets as $secret) {
+        if (isset($secret['profile']) && $secret['profile'] === $name) {
+          return true;
+        }
+      }
+
+      return false;
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal mengecek penggunaan profile: " . $e->getMessage());
     }
   }
 

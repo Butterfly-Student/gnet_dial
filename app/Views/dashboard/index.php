@@ -1521,8 +1521,31 @@
       $usersGrid.html(usersHtml);
     }
 
-    // Initialize
-    fetchAllUsers();
+    // Helper to check connection
+    function checkMikrotikConnection() {
+      return $.ajax({
+        url: '/api/mikrotik/check',
+        type: 'POST',
+        dataType: 'json',
+        timeout: 3000 // 3s timeout for the check itself
+      }).then(response => {
+        return response.success;
+      }).catch(() => false);
+    }
+
+    // Initialize with connection check
+    checkMikrotikConnection().then(online => {
+      if (online) {
+        fetchAllUsers();
+        // Also start resource refresh if online
+        startResourceRefresh();
+      } else {
+        showToast('MikroTik Offline - Data tidak dapat dimuat', 'error');
+        handleResourceError('MikroTik Offline');
+        // Stop resource refresh if offline to prevent spam
+        stopResourceRefresh();
+      }
+    });
 
     // Real-time search on input
     $searchInput.on('input', function () {
@@ -1793,55 +1816,97 @@
 
     // ===== Search and Auto-Refresh Logic =====
     const REFRESH_INTERVAL = 3000; // 3 seconds
-    
+
     // System Resource Monitoring Logic
     let resourceInterval;
     const $resourceSection = $('#system-resource-section');
-    
+
+    let connectionErrorShown = false;
+
+    function startResourceRefresh() {
+      fetchSystemResource();
+      if (resourceInterval) clearInterval(resourceInterval);
+      resourceInterval = setInterval(fetchSystemResource, 5000);
+    }
+
+    function stopResourceRefresh() {
+      if (resourceInterval) clearInterval(resourceInterval);
+    }
+
     function fetchSystemResource() {
       $.ajax({
         url: '/api/mikrotik/resource/info',
         type: 'POST',
         dataType: 'json'
-      }).done(function(response) {
+      }).done(function (response) {
         if (response.success && response.data) {
+          connectionErrorShown = false; // Reset error flag on success
+          $('#sys-uptime').removeClass('text-red-600').addClass('text-blue-600');
           updateResourceUI(response.data);
+        } else {
+          handleResourceError(response.message || 'Gagal mengambil data resource');
         }
+      }).fail(function () {
+        handleResourceError('Gagal menghubungi server');
       });
     }
-    
+
+    function handleResourceError(message) {
+      // Update UI to show offline status
+      $('#sys-board').text('-');
+      $('#sys-version').text('-');
+      $('#sys-uptime').text('Offline').removeClass('text-blue-600').addClass('text-red-600');
+
+      $('#cpu-load-text').text('0%');
+      $('#cpu-load-bar').css('width', '0%').removeClass('bg-purple-500').addClass('bg-gray-400');
+      $('#cpu-freq').text('-');
+      $('#cpu-count').text('-');
+
+      $('#mem-text').text('0/0 MB');
+      $('#mem-bar').css('width', '0%').removeClass('bg-green-500').addClass('bg-gray-400');
+
+      $('#hdd-text').text('0/0 MB');
+      $('#hdd-bar').css('width', '0%').removeClass('bg-yellow-500').addClass('bg-gray-400');
+
+      // Show toast only once until connection is restored
+      if (!connectionErrorShown) {
+        showToast(message, 'error');
+        connectionErrorShown = true;
+      }
+    }
+
     function updateResourceUI(data) {
       // System Info
       $('#sys-board').text(data['board-name'] || '-');
       $('#sys-version').text(data['version'] || '-');
       $('#sys-uptime').text(data['uptime'] || '-');
-      
+
       // CPU Info
       const cpuLoad = parseInt(data['cpu-load'] || 0);
       $('#cpu-load-text').text(cpuLoad + '%');
       $('#cpu-load-bar').css('width', cpuLoad + '%');
       $('#cpu-freq').text(data['cpu-frequency'] || '-');
       $('#cpu-count').text(data['cpu-count'] || '-');
-      
+
       // Memory Info
       const totalMem = parseSize(data['total-memory']);
       const freeMem = parseSize(data['free-memory']);
       const usedMem = totalMem - freeMem;
       const memPercent = totalMem > 0 ? (usedMem / totalMem) * 100 : 0;
-      
+
       $('#mem-text').text(`${formatSize(usedMem)}/${formatSize(totalMem)}`);
       $('#mem-bar').css('width', memPercent + '%');
-      
+
       // HDD Info
       const totalHdd = parseSize(data['total-hdd-space']);
       const freeHdd = parseSize(data['free-hdd-space']);
       const usedHdd = totalHdd - freeHdd;
       const hddPercent = totalHdd > 0 ? (usedHdd / totalHdd) * 100 : 0;
-      
+
       $('#hdd-text').text(`${formatSize(usedHdd)}/${formatSize(totalHdd)}`);
       $('#hdd-bar').css('width', hddPercent + '%');
     }
-    
+
     function parseSize(sizeStr) {
       if (!sizeStr) return 0;
       // Handle format like "32.0MiB" or "7.5MiB"
@@ -1851,7 +1916,7 @@
       if (sizeStr.includes('GiB')) return value * 1024 * 1024 * 1024;
       return value; // Assume bytes if no known suffix
     }
-    
+
     function formatSize(bytes) {
       if (bytes === 0) return '0 B';
       const k = 1024;
@@ -1859,22 +1924,22 @@
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     }
-    
+
     function startResourceRefresh() {
       if (resourceInterval) clearInterval(resourceInterval);
       fetchSystemResource(); // Fetch immediately
       resourceInterval = setInterval(fetchSystemResource, REFRESH_INTERVAL);
     }
-    
+
     function stopResourceRefresh() {
       if (resourceInterval) {
         clearInterval(resourceInterval);
         resourceInterval = null;
       }
     }
-    
-    // Initial start
-    startResourceRefresh();
+
+    // Initial start handled by checkMikrotikConnection
+    // startResourceRefresh();
 
     // Search input event
     $('#search-input').on('input', function () {
@@ -1885,7 +1950,7 @@
 
       // Clear previous timeout
       clearTimeout(searchTimeout);
-      
+
       // Toggle Resource Section
       if (searchTerm.length > 0) {
         $resourceSection.addClass('hidden');

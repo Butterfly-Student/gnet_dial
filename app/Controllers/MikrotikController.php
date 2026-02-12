@@ -249,6 +249,31 @@ class MikrotikController extends BaseController
     }
 
     /**
+     * API: Check connection status for frontend
+     */
+    public function checkConnection()
+    {
+        $this->requireAuth();
+        try {
+            $config = MikrotikSetting::getActive();
+            if (!$config) {
+                return $this->json(['success' => false, 'message' => 'No active configuration']);
+            }
+
+            $api = new MikrotikService($config['host'], $config['port'], $config['username'], $config['password']);
+
+            // This will use the optimized timeout settings
+            if ($api->testConnection()) {
+                return $this->json(['success' => true]);
+            } else {
+                return $this->json(['success' => false, 'message' => 'Connection failed']);
+            }
+        } catch (\Exception $e) {
+            return $this->json(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    /**
      * API: Get all configurations
      */
     public function getAll()
