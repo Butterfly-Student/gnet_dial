@@ -1649,6 +1649,9 @@ class MikrotikService
         'parent-queue' => $parentQueue
       ];
 
+      $this->api->comm('/ppp/profile/set', $params);
+
+      return true;
     } catch (\Exception $e) {
       throw new \Exception("Gagal mengupdate PPP profile '$name': " . $e->getMessage());
     }

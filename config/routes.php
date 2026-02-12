@@ -29,7 +29,8 @@ $router->get('/dashboard', 'DashboardController@index');
 $router->get('/ppp/active', 'PppController@active');
 $router->get('/ppp/non-active', 'PppController@nonActive');
 $router->get('/ppp/secrets', 'PppController@secrets');
-$router->get('/ppp/profiles', 'PppController@profiles');
+$router->get('/ppp/profiles', 'PppProfileController@index'); // Updated to use new controller
+$router->get('/customers', 'CustomerController@index');
 
 // Settings
 $router->get('/mikrotik/logs', 'MikrotikController@logs');
@@ -98,6 +99,20 @@ $router->group('/api', function ($router) {
     $router->post('/user/add', 'UserController@add');
     $router->post('/user/update', 'UserController@update');
     $router->post('/user/delete', 'UserController@delete');
+
+    // Customer API
+    $router->post('/customers/list', 'CustomerController@getList');
+    $router->post('/customers/get', 'CustomerController@getOne');
+    $router->post('/customers/add', 'CustomerController@add');
+    $router->post('/customers/update', 'CustomerController@update');
+    $router->post('/customers/delete', 'CustomerController@delete');
+
+    // PPP Profile API (Database backed)
+    $router->post('/ppp/profiles/list', 'PppProfileController@getList');
+    $router->post('/ppp/profile/get-db', 'PppProfileController@getOne');
+    $router->post('/ppp/profile/add-db', 'PppProfileController@add');
+    $router->post('/ppp/profile/update-db', 'PppProfileController@update');
+    $router->post('/ppp/profile/delete-db', 'PppProfileController@delete');
 });
 
 return $router;

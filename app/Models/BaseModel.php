@@ -172,4 +172,25 @@ class BaseModel {
         $stmt->execute($params);
         return $stmt;
     }
+
+    /**
+     * Start database transaction
+     */
+    public static function beginTransaction() {
+        return static::getConnection()->beginTransaction();
+    }
+
+    /**
+     * Commit database transaction
+     */
+    public static function commit() {
+        return static::getConnection()->commit();
+    }
+
+    /**
+     * Rollback database transaction
+     */
+    public static function rollBack() {
+        return static::getConnection()->rollBack();
+    }
 }
