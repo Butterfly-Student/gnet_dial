@@ -8,11 +8,16 @@ use Models\Customer;
 
 class CustomerController extends BaseController
 {
-    private function getMikrotikService()
+    private function getMikrotikService($mikrotikId = null)
     {
-        $config = MikrotikSetting::getActive();
+        if ($mikrotikId) {
+            $config = MikrotikSetting::find($mikrotikId);
+        } else {
+            $config = MikrotikSetting::getActive();
+        }
+
         if (!$config) {
-            throw new \Exception('Tidak ada konfigurasi MikroTik yang aktif.');
+            throw new \Exception('Konfigurasi MikroTik tidak ditemukan atau tidak aktif.');
         }
 
         $api = new MikrotikService(
@@ -50,13 +55,28 @@ class CustomerController extends BaseController
             // For now, let's fetch all and filter in PHP as dataset might not be huge yet,
             // OR use raw query if BaseModel supports it. BaseModel has query().
 
-            $sql = "SELECT * FROM customers";
+            $mikrotikId = (int)$this->post('mikrotik_id', 0);
+
+            // If no ID passed, try to get active or from session
+            if (!$mikrotikId) {
+                $active = MikrotikSetting::getActive();
+                $mikrotikId = $active['id'] ?? 0;
+            }
+
+            $sql = "SELECT * FROM customers WHERE 1=1";
             $params = [];
 
+            if ($mikrotikId) {
+                $sql .= " AND mikrotik_id = ?";
+                $params[] = $mikrotikId;
+            }
+
             if (!empty($searchTerm)) {
-                $sql .= " WHERE name LIKE ? OR username LIKE ? OR address LIKE ?";
+                $sql .= " AND (name LIKE ? OR username LIKE ? OR address LIKE ?)";
                 $term = "%$searchTerm%";
-                $params = [$term, $term, $term];
+                $params[] = $term;
+                $params[] = $term;
+                $params[] = $term;
             }
 
             $sql .= " ORDER BY name ASC";
@@ -106,6 +126,11 @@ class CustomerController extends BaseController
     {
         $this->requireAuth();
 
+        $activeMikrotik = MikrotikSetting::getActive();
+        if (!$activeMikrotik) {
+            return $this->json(['success' => false, 'message' => 'Tidak ada MikroTik aktif.']);
+        }
+
         $data = [
             'name' => $this->post('name'),
             'username' => $this->post('username'),
@@ -114,14 +139,19 @@ class CustomerController extends BaseController
             'coordinates' => $this->post('coordinates'),
             'address' => $this->post('address'),
             'status' => 'active', // Default
-            'service' => 'pppoe'  // Default
+            'service' => 'pppoe', // Default
+            'mikrotik_id' => $activeMikrotik['id']
         ];
 
         if (empty($data['name']) || empty($data['username']) || empty($data['password']) || empty($data['profile'])) {
             return $this->json(['success' => false, 'message' => 'Semua field wajib diisi kecuali koordinat dan alamat.']);
         }
 
-        // Check duplicate username in DB
+        // Check duplicate username in DB for this Mikrotik (assuming username unique per mikrotik or global?)
+        // Usually unique per Mikrotik. But table has UNIQUE constraint on username globally in Schema V1.
+        // If Schema V2 didn't drop unique constraint, it's global.
+        // Ideally should be unique per mikrotik_id, but keeping global unique for simplicity if schema enforces it.
+        // Let's assume global unique for now as per migration script.
         if (Customer::whereFirst('username', $data['username'])) {
             return $this->json(['success' => false, 'message' => 'Username sudah digunakan.']);
         }
@@ -133,9 +163,7 @@ class CustomerController extends BaseController
             $id = Customer::create($data);
 
             // 2. Sync to Mikrotik
-            $api = $this->getMikrotikService();
-            // Check if exists in Mikrotik to avoid error, or just try add
-            // MikrotikService::addPppSecret throws exception on error
+            $api = $this->getMikrotikService($data['mikrotik_id']);
             $api->addPppSecret($data['username'], $data['password'], $data['profile']);
 
             Customer::commit();
@@ -197,7 +225,7 @@ class CustomerController extends BaseController
             Customer::update($id, $data);
 
             // 2. Sync Mikrotik
-            $api = $this->getMikrotikService();
+            $api = $this->getMikrotikService($customer['mikrotik_id']);
 
             if ($usernameChanged) {
                 // To rename in Mikrotik, we usually set 'name' property.
@@ -250,7 +278,7 @@ class CustomerController extends BaseController
             Customer::delete($id);
 
             // 2. Delete from Mikrotik
-            $api = $this->getMikrotikService();
+            $api = $this->getMikrotikService($customer['mikrotik_id']);
             // Check if exists first to avoid error? deletePppSecret handles "not found" by throwing error?
             // MikrotikService::deletePppSecret throws exception if not found.
             // We should catch that specifically or check existence.

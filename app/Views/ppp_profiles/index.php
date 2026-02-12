@@ -45,30 +45,52 @@
 
 <!-- Add/Edit Profile Modal -->
 <div id="profile-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50 overflow-y-auto">
-    <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+    <div class="relative top-20 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
         <h3 class="text-lg font-medium text-gray-900 mb-4" id="profile-modal-title">Tambah Profile</h3>
         <form id="profile-form">
             <input type="hidden" id="profile-id" name="id">
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Nama Profile</label>
+                    <label class="block text-sm font-medium text-gray-700">Nama Profile <span class="text-red-500">*</span></label>
                     <input type="text" id="profile-name" name="name" class="w-full px-3 py-2 border rounded-lg" required>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Local Address (IP/Pool)</label>
-                    <input type="text" id="profile-local-address" name="local_address" class="w-full px-3 py-2 border rounded-lg" required>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Local Address <span class="text-red-500">*</span></label>
+                        <select id="profile-local-address" name="local_address" class="w-full px-3 py-2 border rounded-lg" required>
+                            <option value="">Pilih Pool...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Remote Address <span class="text-red-500">*</span></label>
+                        <select id="profile-remote-address" name="remote_address" class="w-full px-3 py-2 border rounded-lg" required>
+                            <option value="">Pilih Pool...</option>
+                        </select>
+                    </div>
                 </div>
+
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Remote Address (Pool)</label>
-                    <input type="text" id="profile-remote-address" name="remote_address" class="w-full px-3 py-2 border rounded-lg" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Rate Limit (Up/Down)</label>
+                    <label class="block text-sm font-medium text-gray-700">Rate Limit (Up/Down) <span class="text-red-500">*</span></label>
                     <input type="text" id="profile-rate-limit" name="rate_limit" class="w-full px-3 py-2 border rounded-lg" placeholder="e.g. 5M/10M" required>
                 </div>
+
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Parent Queue</label>
-                    <input type="text" id="profile-parent-queue" name="parent_queue" class="w-full px-3 py-2 border rounded-lg" placeholder="Optional">
+                    <select id="profile-parent-queue" name="parent_queue" class="w-full px-3 py-2 border rounded-lg">
+                        <option value="">None</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Harga (Rp)</label>
+                        <input type="number" id="profile-price" name="price" class="w-full px-3 py-2 border rounded-lg" placeholder="0">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Pajak (%)</label>
+                        <input type="number" step="0.01" id="profile-tax-rate" name="tax_rate" class="w-full px-3 py-2 border rounded-lg" placeholder="0">
+                    </div>
                 </div>
             </div>
             <div class="mt-6 flex gap-3">
@@ -96,19 +118,34 @@
 $(document).ready(function() {
     let editMode = false;
 
-    function showToast(msg, type='info') { alert(msg); }
+    function showToast(msg, type='info') { alert(msg); } // Replace with better toast if available
+
+    function formatRupiah(amount) {
+        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(amount);
+    }
 
     function renderProfileCard(p) {
+        const price = p.price ? formatRupiah(p.price) : 'Rp 0';
+        const tax = p.tax_rate ? p.tax_rate + '%' : '0%';
+
         return `
-            <div class="bg-white p-4 border rounded-xl shadow-sm hover:shadow-md flex justify-between items-center">
-                <div>
-                    <h4 class="font-bold text-lg text-gray-900">${p.name}</h4>
-                    <p class="text-sm text-gray-600">Local: ${p.local_address || '-'} | Remote: ${p.remote_address || '-'}</p>
-                    <p class="text-sm text-gray-600">Rate: ${p.rate_limit || '-'} | Queue: ${p.parent_queue || '-'}</p>
+            <div class="bg-white p-4 border rounded-xl shadow-sm hover:shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-1">
+                        <h4 class="font-bold text-lg text-gray-900">${p.name}</h4>
+                        <span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">${price}</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-600">
+                        <p>Local: <span class="font-medium">${p.local_address || '-'}</span></p>
+                        <p>Remote: <span class="font-medium">${p.remote_address || '-'}</span></p>
+                        <p>Rate: <span class="font-medium">${p.rate_limit || '-'}</span></p>
+                        <p>Queue: <span class="font-medium">${p.parent_queue || '-'}</span></p>
+                        <p>Tax: <span class="font-medium">${tax}</span></p>
+                    </div>
                 </div>
-                <div class="flex gap-2">
-                    <button class="edit-btn p-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50" data-id="${p.id}">Edit</button>
-                    <button class="delete-btn p-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50" data-id="${p.id}" data-name="${p.name}">Del</button>
+                <div class="flex gap-2 w-full sm:w-auto">
+                    <button class="edit-btn flex-1 sm:flex-none p-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50" data-id="${p.id}">Edit</button>
+                    <button class="delete-btn flex-1 sm:flex-none p-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50" data-id="${p.id}" data-name="${p.name}">Del</button>
                 </div>
             </div>
         `;
@@ -129,11 +166,39 @@ $(document).ready(function() {
         });
     }
 
+    function loadDropdowns() {
+        // Load IP Pools
+        $.post('/api/ppp/ip-pools', function(res) {
+            if(res.success) {
+                const pools = res.data;
+                let options = '<option value="">Pilih Pool...</option>';
+                pools.forEach(pool => {
+                    options += `<option value="${pool.name}">${pool.name} (${pool.ranges})</option>`;
+                });
+                $('#profile-local-address').html(options);
+                $('#profile-remote-address').html(options);
+            }
+        });
+
+        // Load Parent Queues
+        $.post('/api/ppp/parent-queues', function(res) {
+            if(res.success) {
+                const queues = res.data;
+                let options = '<option value="">None</option>';
+                queues.forEach(q => {
+                    options += `<option value="${q.name}">${q.name}</option>`;
+                });
+                $('#profile-parent-queue').html(options);
+            }
+        });
+    }
+
     $('#add-profile-btn').click(function() {
         editMode = false;
         $('#profile-modal-title').text('Tambah Profile');
         $('#profile-form')[0].reset();
         $('#profile-id').val('');
+        loadDropdowns(); // Refresh dropdowns
         $('#profile-modal').removeClass('hidden');
     });
 
@@ -143,20 +208,32 @@ $(document).ready(function() {
         const id = $(this).data('id');
         editMode = true;
         $('#profile-modal-title').text('Edit Profile');
-        $.post('/api/ppp/profile/get-db', {id: id}, function(res) {
-            if(res.success) {
-                const d = res.data;
-                $('#profile-id').val(d.id);
-                $('#profile-name').val(d.name);
-                $('#profile-local-address').val(d.local_address);
-                $('#profile-remote-address').val(d.remote_address);
-                $('#profile-rate-limit').val(d.rate_limit);
-                $('#profile-parent-queue').val(d.parent_queue);
-                $('#profile-modal').removeClass('hidden');
-            } else {
-                showToast(res.message, 'error');
-            }
-        });
+        loadDropdowns();
+
+        // Use timeout to allow dropdowns to populate before setting value?
+        // Better: Wait for data then set. But simple timeout works for now or chained promises.
+        // Assuming dropdowns load fast or are already loaded.
+        // Ideally we should load dropdowns once on page load or check if loaded.
+        // For robustness, I'll load them now and then fetch data.
+
+        setTimeout(() => {
+            $.post('/api/ppp/profile/get-db', {id: id}, function(res) {
+                if(res.success) {
+                    const d = res.data;
+                    $('#profile-id').val(d.id);
+                    $('#profile-name').val(d.name);
+                    $('#profile-local-address').val(d.local_address);
+                    $('#profile-remote-address').val(d.remote_address);
+                    $('#profile-rate-limit').val(d.rate_limit);
+                    $('#profile-parent-queue').val(d.parent_queue);
+                    $('#profile-price').val(d.price);
+                    $('#profile-tax-rate').val(d.tax_rate);
+                    $('#profile-modal').removeClass('hidden');
+                } else {
+                    showToast(res.message, 'error');
+                }
+            });
+        }, 500); // Slight delay to ensure dropdowns populated
     });
 
     $('#profile-form').submit(function(e) {
@@ -208,7 +285,9 @@ $(document).ready(function() {
     $('#refresh-btn').click(function() { fetchProfiles($('#search-input').val()); });
     $('#search-input').on('input', function() { fetchProfiles($(this).val()); });
 
+    // Initial load
     fetchProfiles();
+    loadDropdowns();
 });
 </script>
 <?php include APP_PATH . '/Views/layouts/footer.php'; ?>

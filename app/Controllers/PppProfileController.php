@@ -8,11 +8,16 @@ use Models\PppProfile;
 
 class PppProfileController extends BaseController
 {
-    private function getMikrotikService()
+    private function getMikrotikService($mikrotikId = null)
     {
-        $config = MikrotikSetting::getActive();
+        if ($mikrotikId) {
+            $config = MikrotikSetting::find($mikrotikId);
+        } else {
+            $config = MikrotikSetting::getActive();
+        }
+
         if (!$config) {
-            throw new \Exception('Tidak ada konfigurasi MikroTik yang aktif.');
+            throw new \Exception('Konfigurasi MikroTik tidak ditemukan atau tidak aktif.');
         }
 
         $api = new MikrotikService(
@@ -44,13 +49,26 @@ class PppProfileController extends BaseController
             $page = (int)$this->post('page', 1);
             $limit = $this->post('limit', 25);
 
-            $sql = "SELECT * FROM ppp_profiles";
+            $mikrotikId = (int)$this->post('mikrotik_id', 0);
+
+            // If no ID passed, try to get active or from session
+            if (!$mikrotikId) {
+                $active = MikrotikSetting::getActive();
+                $mikrotikId = $active['id'] ?? 0;
+            }
+
+            $sql = "SELECT * FROM ppp_profiles WHERE 1=1";
             $params = [];
 
+            if ($mikrotikId) {
+                $sql .= " AND mikrotik_id = ?";
+                $params[] = $mikrotikId;
+            }
+
             if (!empty($searchTerm)) {
-                $sql .= " WHERE name LIKE ?";
+                $sql .= " AND name LIKE ?";
                 $term = "%$searchTerm%";
-                $params = [$term];
+                $params[] = $term;
             }
 
             $sql .= " ORDER BY name ASC";
@@ -83,18 +101,29 @@ class PppProfileController extends BaseController
     {
         $this->requireAuth();
 
+        $activeMikrotik = MikrotikSetting::getActive();
+        if (!$activeMikrotik) {
+            return $this->json(['success' => false, 'message' => 'Tidak ada MikroTik aktif.']);
+        }
+
         $data = [
             'name' => $this->post('name'),
             'local_address' => $this->post('local_address'),
             'remote_address' => $this->post('remote_address'),
             'rate_limit' => $this->post('rate_limit'),
-            'parent_queue' => $this->post('parent_queue')
+            'parent_queue' => $this->post('parent_queue'),
+            'price' => $this->post('price', 0),
+            'tax_rate' => $this->post('tax_rate', 0),
+            'mikrotik_id' => $activeMikrotik['id']
         ];
 
         if (empty($data['name'])) {
             return $this->json(['success' => false, 'message' => 'Nama profile wajib diisi.']);
         }
 
+        // Check duplicates for this Mikrotik
+        // Assuming names are unique per mikrotik? Or global?
+        // Let's assume unique globally for now as per schema
         if (PppProfile::whereFirst('name', $data['name'])) {
             return $this->json(['success' => false, 'message' => 'Nama profile sudah digunakan.']);
         }
@@ -104,7 +133,7 @@ class PppProfileController extends BaseController
 
             PppProfile::create($data);
 
-            $api = $this->getMikrotikService();
+            $api = $this->getMikrotikService($data['mikrotik_id']);
             $api->addPppProfile(
                 $data['name'],
                 $data['local_address'],
@@ -133,7 +162,9 @@ class PppProfileController extends BaseController
             'local_address' => $this->post('local_address'),
             'remote_address' => $this->post('remote_address'),
             'rate_limit' => $this->post('rate_limit'),
-            'parent_queue' => $this->post('parent_queue')
+            'parent_queue' => $this->post('parent_queue'),
+            'price' => $this->post('price', 0),
+            'tax_rate' => $this->post('tax_rate', 0)
         ];
 
         $profile = PppProfile::find($id);
@@ -156,7 +187,7 @@ class PppProfileController extends BaseController
 
             PppProfile::update($id, $data);
 
-            $api = $this->getMikrotikService();
+            $api = $this->getMikrotikService($profile['mikrotik_id']);
 
             if ($oldName !== $newName) {
                 // Rename logic: Delete old, Add new
@@ -203,7 +234,7 @@ class PppProfileController extends BaseController
 
             PppProfile::delete($id);
 
-            $api = $this->getMikrotikService();
+            $api = $this->getMikrotikService($profile['mikrotik_id']);
 
             try {
                 $api->deletePppProfile($profile['name']);
