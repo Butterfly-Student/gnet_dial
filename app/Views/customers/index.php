@@ -350,11 +350,12 @@
     }
 
     function fetchProfiles() {
-        $.post('/api/ppp/profiles', function(res) {
+        $.post('/api/ppp/profiles/list', {limit: 'all'}, function(res) {
             if(res.success && res.data) {
                 const $sel = $('#customer-profile');
                 $sel.empty().append('<option value="">Pilih profile...</option>');
                 res.data.forEach(p => {
+                    // Assuming price and tax are available, we could show them, but name is enough
                     $sel.append(`<option value="${p.name}">${p.name}</option>`);
                 });
             }

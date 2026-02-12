@@ -63,10 +63,8 @@
 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Local Address <span class="text-red-500">*</span></label>
-                        <select id="profile-local-address" name="local_address" class="w-full px-3 py-2 border rounded-lg" required>
-                            <option value="">Pilih Pool...</option>
-                        </select>
+                        <label class="block text-sm font-medium text-gray-700">Local Address (IP) <span class="text-red-500">*</span></label>
+                        <input type="text" id="profile-local-address" name="local_address" class="w-full px-3 py-2 border rounded-lg" placeholder="e.g. 192.168.1.1" required>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Remote Address <span class="text-red-500">*</span></label>
@@ -181,7 +179,7 @@ $(document).ready(function() {
                 pools.forEach(pool => {
                     options += `<option value="${pool.name}">${pool.name} (${pool.ranges})</option>`;
                 });
-                $('#profile-local-address').html(options);
+                // $('#profile-local-address').html(options); // Removed: Local address is manual input
                 $('#profile-remote-address').html(options);
             }
         });
