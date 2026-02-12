@@ -265,4 +265,37 @@ class PppProfileController extends BaseController
 
         return $this->json(['success' => true, 'data' => $profile]);
     }
+
+    public function syncFromMikrotik()
+    {
+        $this->requireAuth();
+
+        try {
+            $mikrotikId = (int)$this->post('mikrotik_id', 0);
+
+            // If no ID passed, try to get active
+            if (!$mikrotikId) {
+                $active = MikrotikSetting::getActive();
+                if (!$active) {
+                    return $this->json(['success' => false, 'message' => 'Tidak ada MikroTik aktif.']);
+                }
+                $mikrotikId = $active['id'];
+            }
+
+            $api = $this->getMikrotikService($mikrotikId);
+
+            // Note: getMikrotikService checks connection, so we are good to go.
+            // But we need to call syncProfilesToDatabase on the service instance.
+
+            $result = $api->syncProfilesToDatabase($mikrotikId);
+
+            return $this->json([
+                'success' => true,
+                'message' => "Sinkronisasi selesai. Ditambahkan: " . $result['added'] . ", Total: " . $result['total']
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->json(['success' => false, 'message' => 'Gagal sinkronisasi: ' . $e->getMessage()]);
+        }
+    }
 }

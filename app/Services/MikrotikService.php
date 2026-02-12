@@ -1737,5 +1737,67 @@ class MikrotikService
       $this->api->disconnect();
     }
   }
+
+  /**
+   * Sync PPP Profiles from MikroTik to Database
+   * Fetches profiles from MikroTik and inserts them into ppp_profiles table if they don't exist.
+   *
+   * @param int $mikrotikId The ID of the MikroTik device in database
+   * @return array Result of sync operation
+   */
+  public function syncProfilesToDatabase($mikrotikId)
+  {
+    try {
+      $this->connect();
+      if (!$this->connected) {
+        throw new \Exception("Tidak terhubung ke MikroTik");
+      }
+
+      $profiles = $this->api->comm('/ppp/profile/print');
+
+      if (!is_array($profiles)) {
+        return ['added' => 0, 'total' => 0];
+      }
+
+      $addedCount = 0;
+
+      foreach ($profiles as $profile) {
+        $name = $profile['name'] ?? '';
+
+        // Skip default profile or empty names if needed, but usually we sync all
+        if (empty($name)) continue;
+
+        // Check if exists in DB for this Mikrotik
+        $exists = \Models\PppProfile::query(
+            "SELECT COUNT(*) as count FROM ppp_profiles WHERE name = ? AND mikrotik_id = ?",
+            [$name, $mikrotikId]
+        )->fetch();
+
+        if ($exists['count'] == 0) {
+            // Insert
+            \Models\PppProfile::create([
+                'name' => $name,
+                'local_address' => $profile['local-address'] ?? '',
+                'remote_address' => $profile['remote-address'] ?? '',
+                'rate_limit' => $profile['rate-limit'] ?? '',
+                'parent_queue' => $profile['parent-queue'] ?? '',
+                'mikrotik_id' => $mikrotikId,
+                'price' => 0,
+                'tax_rate' => 0
+            ]);
+            $addedCount++;
+        }
+      }
+
+      return [
+          'success' => true,
+          'added' => $addedCount,
+          'total' => count($profiles)
+      ];
+
+    } catch (\Exception $e) {
+      throw new \Exception("Gagal sinkronisasi profiles: " . $e->getMessage());
+    }
+  }
 }
 

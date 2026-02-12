@@ -19,10 +19,16 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="lucide lucide-layers mr-3 text-blue-600 w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>
             PPP Profiles
         </h2>
-        <button id="add-profile-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center">
-             <svg xmlns="http://www.w3.org/2000/svg" class="lucide lucide-plus w-5 h-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-             Tambah Profile
-        </button>
+        <div class="flex gap-2">
+            <button id="sync-profile-btn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="lucide lucide-refresh-cw w-5 h-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                 Sync from MikroTik
+            </button>
+            <button id="add-profile-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="lucide lucide-plus w-5 h-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                 Tambah Profile
+            </button>
+        </div>
       </div>
 
       <div class="max-w-2xl mx-auto">
@@ -200,6 +206,25 @@ $(document).ready(function() {
         $('#profile-id').val('');
         loadDropdowns(); // Refresh dropdowns
         $('#profile-modal').removeClass('hidden');
+    });
+
+    $('#sync-profile-btn').click(function() {
+        if(!confirm('Sync profiles from MikroTik to Database? Existing database profiles will be kept, new ones added.')) return;
+
+        $(this).prop('disabled', true).text('Syncing...');
+        $.post('/api/ppp/profile/sync', function(res) {
+            $('#sync-profile-btn').prop('disabled', false).html('<svg xmlns="http://www.w3.org/2000/svg" class="lucide lucide-refresh-cw w-5 h-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg> Sync from MikroTik');
+
+            if(res.success) {
+                showToast(res.message, 'success');
+                fetchProfiles();
+            } else {
+                showToast(res.message, 'error');
+            }
+        }).fail(function() {
+            $('#sync-profile-btn').prop('disabled', false).text('Sync from MikroTik');
+            showToast('Sync failed', 'error');
+        });
     });
 
     $('#cancel-profile-btn').click(function() { $('#profile-modal').addClass('hidden'); });

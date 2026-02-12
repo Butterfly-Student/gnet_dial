@@ -113,6 +113,7 @@ $router->group('/api', function ($router) {
     $router->post('/ppp/profile/add-db', 'PppProfileController@add');
     $router->post('/ppp/profile/update-db', 'PppProfileController@update');
     $router->post('/ppp/profile/delete-db', 'PppProfileController@delete');
+    $router->post('/ppp/profile/sync', 'PppProfileController@syncFromMikrotik');
 });
 
 return $router;
