@@ -147,13 +147,10 @@ class CustomerController extends BaseController
             return $this->json(['success' => false, 'message' => 'Semua field wajib diisi kecuali koordinat dan alamat.']);
         }
 
-        // Check duplicate username in DB for this Mikrotik (assuming username unique per mikrotik or global?)
-        // Usually unique per Mikrotik. But table has UNIQUE constraint on username globally in Schema V1.
-        // If Schema V2 didn't drop unique constraint, it's global.
-        // Ideally should be unique per mikrotik_id, but keeping global unique for simplicity if schema enforces it.
-        // Let's assume global unique for now as per migration script.
-        if (Customer::whereFirst('username', $data['username'])) {
-            return $this->json(['success' => false, 'message' => 'Username sudah digunakan.']);
+        // Check duplicate username in DB for this Mikrotik
+        $exists = Customer::query("SELECT id FROM customers WHERE username = ? AND mikrotik_id = ?", [$data['username'], $data['mikrotik_id']])->fetch();
+        if ($exists) {
+            return $this->json(['success' => false, 'message' => 'Username sudah digunakan di MikroTik ini.']);
         }
 
         try {
@@ -206,8 +203,11 @@ class CustomerController extends BaseController
         $newUsername = $data['username'];
         $usernameChanged = $oldUsername !== $newUsername;
 
-        if ($usernameChanged && Customer::whereFirst('username', $newUsername)) {
-             return $this->json(['success' => false, 'message' => 'Username baru sudah digunakan.']);
+        if ($usernameChanged) {
+             $exists = Customer::query("SELECT id FROM customers WHERE username = ? AND mikrotik_id = ?", [$newUsername, $customer['mikrotik_id']])->fetch();
+             if ($exists) {
+                 return $this->json(['success' => false, 'message' => 'Username baru sudah digunakan di MikroTik ini.']);
+             }
         }
 
         try {
@@ -370,9 +370,10 @@ class CustomerController extends BaseController
             }
 
             // Check duplicates
-            if (Customer::whereFirst('username', $username)) {
+            $exists = Customer::query("SELECT id FROM customers WHERE username = ? AND mikrotik_id = ?", [$username, $activeMikrotik['id']])->fetch();
+            if ($exists) {
                 $failed++;
-                $errors[] = "Baris " . ($index + 1) . ": Username '$username' sudah ada.";
+                $errors[] = "Baris " . ($index + 1) . ": Username '$username' sudah ada di MikroTik ini.";
                 continue;
             }
 

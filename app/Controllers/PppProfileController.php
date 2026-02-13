@@ -122,10 +122,9 @@ class PppProfileController extends BaseController
         }
 
         // Check duplicates for this Mikrotik
-        // Assuming names are unique per mikrotik? Or global?
-        // Let's assume unique globally for now as per schema
-        if (PppProfile::whereFirst('name', $data['name'])) {
-            return $this->json(['success' => false, 'message' => 'Nama profile sudah digunakan.']);
+        $exists = PppProfile::query("SELECT id FROM ppp_profiles WHERE name = ? AND mikrotik_id = ?", [$data['name'], $data['mikrotik_id']])->fetch();
+        if ($exists) {
+            return $this->json(['success' => false, 'message' => 'Nama profile sudah digunakan di MikroTik ini.']);
         }
 
         try {
@@ -177,8 +176,9 @@ class PppProfileController extends BaseController
         $newName = $data['name'];
 
         if ($oldName !== $newName) {
-            if (PppProfile::whereFirst('name', $newName)) {
-                return $this->json(['success' => false, 'message' => 'Nama profile baru sudah digunakan.']);
+            $exists = PppProfile::query("SELECT id FROM ppp_profiles WHERE name = ? AND mikrotik_id = ?", [$newName, $profile['mikrotik_id']])->fetch();
+            if ($exists) {
+                return $this->json(['success' => false, 'message' => 'Nama profile baru sudah digunakan di MikroTik ini.']);
             }
         }
 
