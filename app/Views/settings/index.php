@@ -1,6 +1,6 @@
 <?php include APP_PATH . '/Views/layouts/header.php'; ?>
 
-<div class="container mx-auto p-2 sm:p-6 lg:p-8">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
   <!-- Toast Container -->
   <div id="toast-container" class="fixed top-4 right-4 z-[100] max-w-xs sm:max-w-sm"></div>
