@@ -58,6 +58,21 @@ class BaseController {
      * @return mixed
      */
     protected function post($key = null, $default = null) {
+        // Handle JSON Input
+        $contentType = $_SERVER["CONTENT_TYPE"] ?? '';
+        if (stripos($contentType, 'application/json') !== false) {
+            static $jsonInput = null;
+            if ($jsonInput === null) {
+                $jsonInput = json_decode(file_get_contents('php://input'), true) ?? [];
+            }
+
+            if ($key === null) {
+                return $jsonInput;
+            }
+            return $jsonInput[$key] ?? $default;
+        }
+
+        // Handle Standard POST
         if ($key === null) {
             return $_POST;
         }

@@ -547,9 +547,15 @@
                 return;
             }
 
-            // Headers assumption: Name,Username,Password,Profile,Service,Phone,Address,Coordinates
+            // Detect delimiter
+            const firstLine = rows[0];
+            let delimiter = ',';
+            if (firstLine.includes('\t')) delimiter = '\t';
+            else if (firstLine.includes(';')) delimiter = ';';
+
+            // Headers assumption
             importData = [];
-            const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
+            const headers = rows[0].split(delimiter).map(h => h.trim().toLowerCase());
 
             // Map headers to keys
             const map = {
@@ -563,8 +569,7 @@
                 coordinates: headers.indexOf('coordinates')
             };
 
-            // If headers not found by name, assume fixed index:
-            // 0=Name, 1=Username, 2=Password, 3=Profile, 4=Service, 5=Phone, 6=Address, 7=Coordinates
+            // If headers not found by name, assume fixed index
             if(map.name === -1) {
                 map.name = 0; map.username = 1; map.password = 2; map.profile = 3;
                 map.service = 4; map.phone = 5; map.address = 6; map.coordinates = 7;
@@ -574,7 +579,7 @@
             previewBody.empty();
 
             for(let i=1; i<rows.length; i++) {
-                const cols = rows[i].split(',');
+                const cols = rows[i].split(delimiter);
 
                 if(cols.length < 4) continue; // Skip invalid lines
 
