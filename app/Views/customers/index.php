@@ -31,16 +31,40 @@
           Customers
         </h2>
 
-        <button id="add-customer-btn"
-          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center shadow-md h-[42px] min-w-[120px]">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-            class="lucide lucide-plus w-4 h-4 sm:w-5 sm:h-5 mr-2">
-            <path d="M5 12h14" />
-            <path d="M12 5v14" />
-          </svg>
-          <span class="text-sm sm:text-base">Tambah Customer</span>
-        </button>
+        <div class="flex gap-2">
+            <a href="/api/customers/export" target="_blank"
+                class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center shadow-md h-[42px]">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="lucide lucide-download w-4 h-4 sm:w-5 sm:h-5 mr-2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" x2="12" y1="15" y2="3" />
+                </svg>
+                <span class="hidden sm:inline">Export</span>
+            </a>
+            <button id="import-btn"
+                class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center shadow-md h-[42px]">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="lucide lucide-upload w-4 h-4 sm:w-5 sm:h-5 mr-2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" x2="12" y1="3" y2="15" />
+                </svg>
+                <span class="hidden sm:inline">Import</span>
+            </button>
+            <button id="add-customer-btn"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center shadow-md h-[42px] min-w-[120px]">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="lucide lucide-plus w-4 h-4 sm:w-5 sm:h-5 mr-2">
+                    <path d="M5 12h14" />
+                    <path d="M12 5v14" />
+                </svg>
+                <span class="text-sm sm:text-base">Tambah</span>
+            </button>
+        </div>
       </div>
 
       <!-- Search Section -->
@@ -249,6 +273,41 @@
   </div>
 </div>
 
+<!-- Import Modal -->
+<div id="import-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-10 sm:top-20 mx-auto p-4 sm:p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Import Customers (CSV)</h3>
+
+        <div id="import-step-1">
+            <p class="text-sm text-gray-500 mb-4">Format CSV: Name, Username, Password, Profile, Service (optional), Address (optional), Coordinates (optional). Header baris pertama diabaikan.</p>
+            <input type="file" id="csv-file" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+        </div>
+
+        <div id="import-step-2" class="hidden mt-4">
+            <h4 class="font-medium text-gray-800 mb-2">Preview Data</h4>
+            <div class="overflow-x-auto max-h-96 border rounded-lg">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profile</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="import-preview-body" class="bg-white divide-y divide-gray-200"></tbody>
+                </table>
+            </div>
+            <p id="import-count" class="text-sm text-gray-600 mt-2"></p>
+        </div>
+
+        <div class="mt-6 flex gap-3 justify-end">
+            <button id="cancel-import-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg">Batal</button>
+            <button id="process-import-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg hidden disabled:opacity-50">Proses Import</button>
+        </div>
+    </div>
+</div>
+
 <!-- Delete Modal (similar to Secrets) -->
 <div id="delete-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
     <!-- Content same as secrets but adjusted texts via JS -->
@@ -443,6 +502,131 @@
                 fetchCustomers();
             } else {
                 showToast(res.message, 'error');
+            }
+        });
+    });
+
+    // Import Logic
+    $('#import-btn').click(function() {
+        $('#import-modal').removeClass('hidden');
+        $('#import-step-1').removeClass('hidden');
+        $('#import-step-2').addClass('hidden');
+        $('#process-import-btn').addClass('hidden');
+        $('#csv-file').val('');
+    });
+
+    $('#cancel-import-btn').click(function() {
+        $('#import-modal').addClass('hidden');
+    });
+
+    let importData = [];
+
+    $('#csv-file').change(function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const text = e.target.result;
+            const rows = text.split('\n').map(r => r.trim()).filter(r => r);
+            if(rows.length < 2) {
+                alert('File kosong atau format salah');
+                return;
+            }
+
+            // Headers assumption: Name,Username,Password,Profile,Service,Address,Coordinates
+            // Or flexible. Let's assume order or first row headers.
+            // Requirement: "Preview data... then import"
+            // Let's assume first row is header and we skip it.
+
+            importData = [];
+            const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
+
+            // Map headers to keys
+            const map = {
+                name: headers.indexOf('name'),
+                username: headers.indexOf('username'),
+                password: headers.indexOf('password'),
+                profile: headers.indexOf('profile'),
+                service: headers.indexOf('service'),
+                address: headers.indexOf('address'),
+                coordinates: headers.indexOf('coordinates')
+            };
+
+            // If headers not found by name, assume fixed index: 0=Name, 1=Username, 2=Password, 3=Profile
+            if(map.name === -1) {
+                map.name = 0; map.username = 1; map.password = 2; map.profile = 3;
+                map.service = 4; map.address = 5; map.coordinates = 6;
+            }
+
+            const previewBody = $('#import-preview-body');
+            previewBody.empty();
+
+            for(let i=1; i<rows.length; i++) {
+                // Handle comma in quotes? Simple split for now.
+                // For better CSV parsing, a library is needed, but for this task simple split is standard unless specified.
+                const cols = rows[i].split(',');
+
+                if(cols.length < 4) continue; // Skip invalid lines
+
+                const rowData = {
+                    name: cols[map.name]?.trim(),
+                    username: cols[map.username]?.trim(),
+                    password: cols[map.password]?.trim(),
+                    profile: cols[map.profile]?.trim(),
+                    service: cols[map.service]?.trim() || 'pppoe',
+                    address: cols[map.address]?.trim() || '',
+                    coordinates: cols[map.coordinates]?.trim() || ''
+                };
+
+                importData.push(rowData);
+
+                if(i <= 10) { // Preview first 10
+                    previewBody.append(`
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${rowData.name}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${rowData.username}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${rowData.profile}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Ready</td>
+                        </tr>
+                    `);
+                }
+            }
+
+            $('#import-count').text(`Total ${importData.length} data ditemukan. (Menampilkan 10 pertama)`);
+            $('#import-step-1').addClass('hidden');
+            $('#import-step-2').removeClass('hidden');
+            $('#process-import-btn').removeClass('hidden').prop('disabled', false);
+        };
+        reader.readAsText(file);
+    });
+
+    $('#process-import-btn').click(function() {
+        if(!importData.length) return;
+
+        $(this).prop('disabled', true).text('Memproses...');
+
+        $.ajax({
+            url: '/api/customers/import',
+            type: 'POST',
+            contentType: 'application/json', // Send as JSON
+            data: JSON.stringify({ data: importData }),
+            success: function(res) {
+                $('#process-import-btn').prop('disabled', false).text('Proses Import');
+                if(res.success) {
+                    alert(res.message);
+                    if(res.errors && res.errors.length > 0) {
+                        alert("Errors:\n" + res.errors.join("\n"));
+                    }
+                    $('#import-modal').addClass('hidden');
+                    fetchCustomers();
+                } else {
+                    alert('Gagal: ' + res.message);
+                }
+            },
+            error: function() {
+                $('#process-import-btn').prop('disabled', false).text('Proses Import');
+                alert('Gagal terhubung ke server');
             }
         });
     });

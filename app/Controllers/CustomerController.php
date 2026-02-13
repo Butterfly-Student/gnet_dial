@@ -279,12 +279,6 @@ class CustomerController extends BaseController
 
             // 2. Delete from Mikrotik
             $api = $this->getMikrotikService($customer['mikrotik_id']);
-            // Check if exists first to avoid error? deletePppSecret handles "not found" by throwing error?
-            // MikrotikService::deletePppSecret throws exception if not found.
-            // We should catch that specifically or check existence.
-            // But if it's not in Mikrotik, we still want to delete from DB?
-            // User said "Sync". If it fails on Mikrotik, we rollback.
-            // But if it's already gone from Mikrotik, we should probably allow DB delete.
 
             try {
                 $api->deletePppSecret($customer['username']);
@@ -302,5 +296,120 @@ class CustomerController extends BaseController
             Customer::rollBack();
             return $this->json(['success' => false, 'message' => 'Gagal menghapus customer: ' . $e->getMessage()]);
         }
+    }
+
+    public function export()
+    {
+        $this->requireAuth();
+
+        $activeMikrotik = MikrotikSetting::getActive();
+        if (!$activeMikrotik) {
+            die('Tidak ada MikroTik aktif.');
+        }
+
+        $sql = "SELECT name, username, password, profile, service, address, coordinates FROM customers WHERE mikrotik_id = ? ORDER BY name ASC";
+        $stmt = Customer::query($sql, [$activeMikrotik['id']]);
+        $customers = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $filename = "customers_export_" . date('Y-m-d_H-i-s') . ".csv";
+
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+        $output = fopen('php://output', 'w');
+
+        // Header
+        fputcsv($output, ['Name', 'Username', 'Password', 'Profile', 'Service', 'Address', 'Coordinates']);
+
+        foreach ($customers as $row) {
+            fputcsv($output, $row);
+        }
+
+        fclose($output);
+        exit;
+    }
+
+    public function import()
+    {
+        $this->requireAuth();
+
+        $activeMikrotik = MikrotikSetting::getActive();
+        if (!$activeMikrotik) {
+            return $this->json(['success' => false, 'message' => 'Tidak ada MikroTik aktif.']);
+        }
+
+        $data = $this->post('data');
+        if (empty($data) || !is_array($data)) {
+            return $this->json(['success' => false, 'message' => 'Data tidak valid.']);
+        }
+
+        $success = 0;
+        $failed = 0;
+        $errors = [];
+
+        // Use active mikrotik service
+        try {
+            $api = $this->getMikrotikService($activeMikrotik['id']);
+        } catch (\Exception $e) {
+            return $this->json(['success' => false, 'message' => $e->getMessage()]);
+        }
+
+        foreach ($data as $index => $row) {
+            $name = $row['name'] ?? '';
+            $username = $row['username'] ?? '';
+            $password = $row['password'] ?? '';
+            $profile = $row['profile'] ?? '';
+            $service = $row['service'] ?? 'pppoe';
+            $address = $row['address'] ?? '';
+            $coordinates = $row['coordinates'] ?? '';
+
+            if (empty($name) || empty($username) || empty($password) || empty($profile)) {
+                $failed++;
+                $errors[] = "Baris " . ($index + 1) . ": Data tidak lengkap (Name, Username, Password, Profile wajib diisi).";
+                continue;
+            }
+
+            // Check duplicates
+            if (Customer::whereFirst('username', $username)) {
+                $failed++;
+                $errors[] = "Baris " . ($index + 1) . ": Username '$username' sudah ada.";
+                continue;
+            }
+
+            try {
+                Customer::beginTransaction();
+
+                // Add to DB
+                Customer::create([
+                    'name' => $name,
+                    'username' => $username,
+                    'password' => $password,
+                    'profile' => $profile,
+                    'service' => $service,
+                    'address' => $address,
+                    'coordinates' => $coordinates,
+                    'status' => 'active',
+                    'mikrotik_id' => $activeMikrotik['id']
+                ]);
+
+                // Add to Mikrotik
+                // Note: MikrotikService::addPppSecret throws exception on failure
+                $api->addPppSecret($username, $password, $profile);
+
+                Customer::commit();
+                $success++;
+
+            } catch (\Exception $e) {
+                Customer::rollBack();
+                $failed++;
+                $errors[] = "Baris " . ($index + 1) . " ($username): " . $e->getMessage();
+            }
+        }
+
+        return $this->json([
+            'success' => true,
+            'message' => "Import selesai. Berhasil: $success, Gagal: $failed",
+            'errors' => $errors
+        ]);
     }
 }

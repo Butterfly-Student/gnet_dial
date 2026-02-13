@@ -106,6 +106,8 @@ $router->group('/api', function ($router) {
     $router->post('/customers/add', 'CustomerController@add');
     $router->post('/customers/update', 'CustomerController@update');
     $router->post('/customers/delete', 'CustomerController@delete');
+    $router->get('/customers/export', 'CustomerController@export');
+    $router->post('/customers/import', 'CustomerController@import');
 
     // PPP Profile API (Database backed)
     $router->post('/ppp/profiles/list', 'PppProfileController@getList');
