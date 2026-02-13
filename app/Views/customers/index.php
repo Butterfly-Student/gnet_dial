@@ -225,6 +225,14 @@
             </select>
           </div>
 
+          <!-- Phone -->
+          <div>
+            <label for="customer-phone" class="block text-sm font-medium text-gray-700 mb-1">No. Telepon / WA</label>
+            <input type="text" id="customer-phone" name="phone"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              placeholder="08xxxxxxxxxx">
+          </div>
+
           <!-- Coordinates -->
           <div>
             <label for="customer-coordinates" class="block text-sm font-medium text-gray-700 mb-1">Koordinat (Long, Lat)</label>
@@ -279,7 +287,7 @@
         <h3 class="text-lg font-medium text-gray-900 mb-4">Import Customers (CSV)</h3>
 
         <div id="import-step-1">
-            <p class="text-sm text-gray-500 mb-4">Format CSV: Name, Username, Password, Profile, Service (optional), Address (optional), Coordinates (optional). Header baris pertama diabaikan.</p>
+            <p class="text-sm text-gray-500 mb-4">Format CSV: Name, Username, Password, Profile, Service, Phone, Address, Coordinates. Header baris pertama diabaikan.</p>
             <input type="file" id="csv-file" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
         </div>
 
@@ -289,10 +297,14 @@
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profile</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Password</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profile</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Service</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Coordinates</th>
                         </tr>
                     </thead>
                     <tbody id="import-preview-body" class="bg-white divide-y divide-gray-200"></tbody>
@@ -452,6 +464,7 @@
                 $('#customer-profile').val(d.profile);
                 $('#customer-coordinates').val(d.coordinates);
                 $('#customer-address').val(d.address);
+                $('#customer-phone').val(d.phone);
                 $('#customer-status').val(d.status);
                 $('#customer-modal').removeClass('hidden');
             } else {
@@ -534,11 +547,7 @@
                 return;
             }
 
-            // Headers assumption: Name,Username,Password,Profile,Service,Address,Coordinates
-            // Or flexible. Let's assume order or first row headers.
-            // Requirement: "Preview data... then import"
-            // Let's assume first row is header and we skip it.
-
+            // Headers assumption: Name,Username,Password,Profile,Service,Phone,Address,Coordinates
             importData = [];
             const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
 
@@ -549,22 +558,22 @@
                 password: headers.indexOf('password'),
                 profile: headers.indexOf('profile'),
                 service: headers.indexOf('service'),
+                phone: headers.indexOf('phone'),
                 address: headers.indexOf('address'),
                 coordinates: headers.indexOf('coordinates')
             };
 
-            // If headers not found by name, assume fixed index: 0=Name, 1=Username, 2=Password, 3=Profile
+            // If headers not found by name, assume fixed index:
+            // 0=Name, 1=Username, 2=Password, 3=Profile, 4=Service, 5=Phone, 6=Address, 7=Coordinates
             if(map.name === -1) {
                 map.name = 0; map.username = 1; map.password = 2; map.profile = 3;
-                map.service = 4; map.address = 5; map.coordinates = 6;
+                map.service = 4; map.phone = 5; map.address = 6; map.coordinates = 7;
             }
 
             const previewBody = $('#import-preview-body');
             previewBody.empty();
 
             for(let i=1; i<rows.length; i++) {
-                // Handle comma in quotes? Simple split for now.
-                // For better CSV parsing, a library is needed, but for this task simple split is standard unless specified.
                 const cols = rows[i].split(',');
 
                 if(cols.length < 4) continue; // Skip invalid lines
@@ -575,6 +584,7 @@
                     password: cols[map.password]?.trim(),
                     profile: cols[map.profile]?.trim(),
                     service: cols[map.service]?.trim() || 'pppoe',
+                    phone: cols[map.phone]?.trim() || '',
                     address: cols[map.address]?.trim() || '',
                     coordinates: cols[map.coordinates]?.trim() || ''
                 };
@@ -584,10 +594,14 @@
                 if(i <= 10) { // Preview first 10
                     previewBody.append(`
                         <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${rowData.name}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${rowData.username}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${rowData.profile}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Ready</td>
+                            <td class="px-4 py-2 whitespace-nowrap text-xs text-gray-900">${rowData.name}</td>
+                            <td class="px-4 py-2 whitespace-nowrap text-xs text-gray-500">${rowData.username}</td>
+                            <td class="px-4 py-2 whitespace-nowrap text-xs text-gray-500">${rowData.password}</td>
+                            <td class="px-4 py-2 whitespace-nowrap text-xs text-gray-500">${rowData.profile}</td>
+                            <td class="px-4 py-2 whitespace-nowrap text-xs text-gray-500">${rowData.service}</td>
+                            <td class="px-4 py-2 whitespace-nowrap text-xs text-gray-500">${rowData.phone}</td>
+                            <td class="px-4 py-2 whitespace-nowrap text-xs text-gray-500 max-w-xs truncate" title="${rowData.address}">${rowData.address}</td>
+                            <td class="px-4 py-2 whitespace-nowrap text-xs text-gray-500">${rowData.coordinates}</td>
                         </tr>
                     `);
                 }

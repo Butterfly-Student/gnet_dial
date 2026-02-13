@@ -138,6 +138,7 @@ class CustomerController extends BaseController
             'profile' => $this->post('profile'),
             'coordinates' => $this->post('coordinates'),
             'address' => $this->post('address'),
+            'phone' => $this->post('phone'),
             'status' => 'active', // Default
             'service' => 'pppoe', // Default
             'mikrotik_id' => $activeMikrotik['id']
@@ -187,6 +188,7 @@ class CustomerController extends BaseController
             'profile' => $this->post('profile'),
             'coordinates' => $this->post('coordinates'),
             'address' => $this->post('address'),
+            'phone' => $this->post('phone'),
             'status' => $this->post('status')
         ];
 
@@ -307,7 +309,7 @@ class CustomerController extends BaseController
             die('Tidak ada MikroTik aktif.');
         }
 
-        $sql = "SELECT name, username, password, profile, service, address, coordinates FROM customers WHERE mikrotik_id = ? ORDER BY name ASC";
+        $sql = "SELECT name, username, password, profile, service, phone, address, coordinates FROM customers WHERE mikrotik_id = ? ORDER BY name ASC";
         $stmt = Customer::query($sql, [$activeMikrotik['id']]);
         $customers = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
@@ -319,7 +321,7 @@ class CustomerController extends BaseController
         $output = fopen('php://output', 'w');
 
         // Header
-        fputcsv($output, ['Name', 'Username', 'Password', 'Profile', 'Service', 'Address', 'Coordinates']);
+        fputcsv($output, ['Name', 'Username', 'Password', 'Profile', 'Service', 'Phone', 'Address', 'Coordinates']);
 
         foreach ($customers as $row) {
             fputcsv($output, $row);
@@ -361,6 +363,7 @@ class CustomerController extends BaseController
             $profile = $row['profile'] ?? '';
             $service = $row['service'] ?? 'pppoe';
             $address = $row['address'] ?? '';
+            $phone = $row['phone'] ?? '';
             $coordinates = $row['coordinates'] ?? '';
 
             if (empty($name) || empty($username) || empty($password) || empty($profile)) {
@@ -387,6 +390,7 @@ class CustomerController extends BaseController
                     'password' => $password,
                     'profile' => $profile,
                     'service' => $service,
+                    'phone' => $phone,
                     'address' => $address,
                     'coordinates' => $coordinates,
                     'status' => 'active',
