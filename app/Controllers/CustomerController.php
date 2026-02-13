@@ -398,8 +398,19 @@ class CustomerController extends BaseController
                 ]);
 
                 // Add to Mikrotik
-                // Note: MikrotikService::addPppSecret throws exception on failure
-                $api->addPppSecret($username, $password, $profile);
+                try {
+                    $api->addPppSecret($username, $password, $profile);
+                } catch (\Exception $mkError) {
+                    // Check if error implies it already exists
+                    // Mikrotik error usually contains "already have item with such name"
+                    if (stripos($mkError->getMessage(), 'already have') !== false || stripos($mkError->getMessage(), 'already exists') !== false) {
+                        // Already exists in Mikrotik, but we just added to DB. Keep DB and consider success.
+                        // Ideally we verify properties match, but for now we accept it as synced.
+                    } else {
+                        // Real error, rethrow to trigger rollback
+                        throw $mkError;
+                    }
+                }
 
                 Customer::commit();
                 $success++;
